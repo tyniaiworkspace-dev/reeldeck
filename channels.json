@@ -1,0 +1,20 @@
+{
+  "updated": "2026-11-23",
+  "queries": ["ai stories", "short drama", "ai tale"],
+  "channels": [
+    { "id": "x6pgob6", "name": "Vaughn.Tales", "note": "AI drama" },
+    { "id": "x6p7rme", "name": "Cotton Inlet Pictures", "note": "AI drama" },
+    { "id": "x6otekq", "name": "RubyScreenLanternEpic", "note": "AI BL drama" },
+    { "id": "x6o7k0q", "name": "DovetailCinemaCove", "note": "AI drama" },
+    { "id": "x6o7le6", "name": "GarnetFilmCreek", "note": "AI drama" },
+    { "id": "x6p7w5y", "name": "Cotton Manor Screen", "note": "AI drama" },
+    { "id": "x6o1ue6", "name": "Banyan Veranda Screen", "note": "AI drama" },
+    { "id": "x6hv7j6", "name": "Caelisse.Intrigue", "note": "AI drama" },
+    { "id": "x6o1whu", "name": "Bison Causeway Cinema", "note": "AI drama" },
+    { "id": "x6o0k8e", "name": "Chestnut Corner Tales", "note": "AI drama" },
+    { "id": "x6o2d2i", "name": "Bonfire Annex Narratives", "note": "AI drama" },
+    { "id": "x5ws75u", "name": "Tales by Jenny", "note": "AI stories" },
+    { "id": "x2u28zr", "name": "KIDS CORNER", "note": "AI stories" },
+    { "id": "x2zxano", "name": "Meow Media", "note": "AI stories" }
+  ]
+}

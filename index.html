@@ -1,0 +1,1086 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0f">
+<meta name="description" content="One place for the AI-story reels the family follows. Official players, no downloads.">
+<title>ReelDeck</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --bg:#0b0b0f; --card:#16161f; --card2:#1f1f2b; --line:#262634;
+    --text:#f2f2f7; --muted:#9c9cad; --accent:#ff4d6d; --accent2:#7c5cff;
+    --radius:16px; --tabh:64px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 8px);
+    overscroll-behavior-y:contain;
+  }
+  a{color:inherit;text-decoration:none}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+  header{
+    position:sticky;top:0;z-index:20;
+    background:rgba(11,11,15,.88);backdrop-filter:blur(14px);
+    padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+  .logo{
+    width:30px;height:30px;border-radius:9px;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:grid;place-items:center;
+  }
+  .logo svg{width:14px;height:14px;fill:#fff}
+  .brand h1{font-size:18px;margin:0;letter-spacing:.2px}
+  .brand .tag{font-size:11px;color:var(--muted);margin-left:auto;border:1px solid var(--line);padding:3px 8px;border-radius:999px}
+
+  .search{display:flex;gap:8px}
+  .search input{
+    flex:1;min-width:0;background:var(--card);border:1px solid var(--line);
+    color:var(--text);border-radius:12px;padding:11px 13px;font-size:15px;outline:none;
+  }
+  .search input:focus{border-color:#3b3b52}
+  .search button{
+    background:var(--card2);border:1px solid var(--line);border-radius:12px;
+    padding:0 16px;font-weight:600;font-size:14px;
+  }
+
+  main{padding:14px}
+  section{display:none}
+  section.on{display:block}
+
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{
+    flex:0 0 auto;padding:8px 14px;border-radius:999px;font-size:13px;font-weight:600;
+    background:var(--card);border:1px solid var(--line);color:var(--muted);
+    display:flex;align-items:center;gap:6px;
+  }
+  .chip.on{background:var(--text);color:#0b0b0f;border-color:var(--text)}
+  .chip .n{opacity:.6;font-weight:500}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  @media(min-width:620px){.grid{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:900px){.grid{grid-template-columns:repeat(4,1fr)}}
+
+  .card{
+    display:flex;flex-direction:column;text-align:left;
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    overflow:hidden;transition:transform .12s ease,background .12s ease;
+  }
+  .card:active{transform:scale(.975);background:var(--card2)}
+  .thumb{position:relative;aspect-ratio:3/4;background:#000;overflow:hidden}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .ph{position:absolute;inset:0;display:grid;place-items:center;color:#3a3a4a}
+  .dur{
+    position:absolute;right:7px;bottom:7px;background:rgba(0,0,0,.82);
+    padding:2px 6px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.3px;
+  }
+  .badge{
+    position:absolute;left:7px;top:7px;background:rgba(0,0,0,.72);
+    padding:3px 7px;border-radius:7px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  }
+  .meta{padding:9px 10px 11px;display:flex;flex-direction:column;gap:3px;min-height:64px}
+  .meta .title{
+    font-size:13.5px;font-weight:600;line-height:1.25;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .meta .sub{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .status{padding:26px 8px;text-align:center;color:var(--muted);font-size:14px}
+  .status .big{font-size:34px;margin-bottom:8px;opacity:.6}
+  .status.err{color:#ff8a9c}
+  .retry{
+    margin-top:12px;background:var(--card2);border:1px solid var(--line);
+    padding:10px 18px;border-radius:12px;font-weight:600;font-size:14px;
+  }
+  .more{width:100%;margin-top:14px;padding:14px;border-radius:14px;background:var(--card);border:1px solid var(--line);font-weight:600;color:var(--muted)}
+
+  .skel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .skel .thumb{background:linear-gradient(100deg,#15151d 30%,#1e1e28 50%,#15151d 70%);background-size:200% 100%;animation:sh 1.1s infinite linear}
+  @keyframes sh{to{background-position:-200% 0}}
+
+  /* channels */
+  .row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+  .row .av{width:42px;height:42px;border-radius:50%;flex:0 0 auto;background:linear-gradient(135deg,var(--accent2),var(--accent));display:grid;place-items:center;font-weight:800;font-size:15px;color:#fff}
+  .row .who{flex:1;min-width:0}
+  .row .who b{display:block;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .who span{font-size:12px;color:var(--muted)}
+  .follow{padding:8px 15px;border-radius:999px;font-size:13px;font-weight:700;background:var(--text);color:#0b0b0f;border:1px solid transparent;flex:0 0 auto}
+  .follow.on{background:transparent;color:var(--muted);border-color:var(--line)}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px}
+  .panel h2{font-size:14px;margin:0 0 4px;letter-spacing:.2px}
+  .panel p{font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.45}
+  .inline{display:flex;gap:8px}
+  .inline input{
+    flex:1;min-width:0;background:#0f0f16;border:1px solid var(--line);color:var(--text);
+    border-radius:12px;padding:11px 12px;font-size:14px;outline:none;
+  }
+  .inline button{background:var(--accent);border-radius:12px;padding:0 16px;font-weight:700;font-size:14px;color:#fff}
+
+  .apps{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  @media(min-width:620px){.apps{grid-template-columns:repeat(4,1fr)}}
+  .app{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .app .ico{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:19px;background:var(--card2)}
+  .app b{font-size:13.5px;font-weight:600}
+  .app span{font-size:11.5px;color:var(--muted);line-height:1.3}
+
+  .recent{display:flex;flex-direction:column;gap:8px}
+  .recent .r{display:flex;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;text-align:left}
+  .recent img,.recent .ph2{width:54px;height:54px;border-radius:8px;object-fit:cover;background:var(--card2);flex:0 0 auto;display:grid;place-items:center;font-size:18px}
+  .recent .t{min-width:0}
+  .recent .t b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .recent .t span{font-size:11px;color:var(--muted)}
+
+  /* tab bar */
+  .tabbar{
+    position:fixed;left:0;right:0;bottom:0;z-index:30;
+    display:grid;grid-template-columns:repeat(3,1fr);
+    height:calc(var(--tabh) + env(safe-area-inset-bottom));
+    padding-bottom:env(safe-area-inset-bottom);
+    background:rgba(13,13,18,.94);backdrop-filter:blur(16px);border-top:1px solid var(--line);
+  }
+  .tabbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);font-size:11px;font-weight:600}
+  .tabbar button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .tabbar button.on{color:var(--text)}
+  .tabbar button.on svg{stroke:var(--accent)}
+
+  /* player sheet */
+  .sheet{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.86);backdrop-filter:blur(6px);display:flex;align-items:flex-end}
+  .sheet[hidden]{display:none}
+  .sheet .inner{width:100%;max-height:94vh;background:var(--bg);border-radius:20px 20px 0 0;overflow:auto;padding-bottom:env(safe-area-inset-bottom)}
+  .sheet .bar{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:2}
+  .sheet .bar h3{font-size:14px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .x{width:34px;height:34px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font-size:17px;flex:0 0 auto}
+  .frame{position:relative;background:#000;aspect-ratio:9/16;max-height:70vh;margin:0 auto}
+  .frame.wide{aspect-ratio:16/9;max-height:56vh}
+  .frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .fallback{padding:34px 18px;text-align:center;color:var(--muted);font-size:14px;line-height:1.5}
+  .sheet .actions{display:flex;gap:8px;padding:12px 14px 16px}
+  .sheet .actions a,.sheet .actions button{
+    flex:1;text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;
+    background:var(--card2);border:1px solid var(--line);
+  }
+  .sheet .actions .primary{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  .installbar{
+    position:fixed;left:10px;right:10px;bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 10px);
+    z-index:50;display:flex;gap:10px;align-items:center;
+    background:#1d1d2a;border:1px solid #33334a;border-radius:14px;padding:11px 12px;
+    font-size:12.5px;color:var(--muted);
+  }
+  .installbar span{flex:1;line-height:1.35}
+  .installbar button{width:26px;height:26px;border-radius:50%;background:#2c2c3e;display:grid;place-items:center;flex:0 0 auto;font-size:12px}
+
+  .tabbar{grid-template-columns:repeat(4,1fr)}
+  .tabbar button{position:relative}
+  .tabn{position:absolute;top:6px;right:calc(50% - 22px);min-width:16px;height:16px;border-radius:999px;background:var(--accent);color:#fff;font-size:9.5px;font-weight:800;display:grid;place-items:center;padding:0 4px}
+  .tabn:empty{display:none}
+
+  .tools{display:flex;gap:8px;margin-bottom:12px}
+  .tools button{flex:1;padding:11px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted)}
+  .importbar{display:flex;gap:8px;align-items:center;background:#221a2b;border:1px solid #43315a;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:12.5px}
+  .importbar span{flex:1;line-height:1.35}
+  .importbar button{padding:8px 12px;border-radius:9px;background:var(--card2);font-size:12.5px;font-weight:700;flex:0 0 auto}
+  .importbar #importYes{background:var(--accent);color:#fff}
+
+  .state{position:absolute;right:7px;top:7px;padding:3px 7px;border-radius:7px;font-size:9.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase}
+  .state.ok{background:#12351f;color:#5ee08a}
+  .state.dead{background:#3a1520;color:#ff7d94}
+  .state.app{background:#1b2438;color:#8fb4ff}
+  .state.checking{background:#2a2a36;color:#c9c9d6}
+  .card .del{position:absolute;left:7px;bottom:7px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.72);color:#ff9aab;font-size:12px;display:grid;place-items:center}
+
+  .toast{
+    position:fixed;left:50%;bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 18px);
+    transform:translate(-50%,20px);opacity:0;pointer-events:none;
+    background:#242432;border:1px solid #34344a;padding:11px 18px;border-radius:999px;
+    font-size:13px;font-weight:600;z-index:80;transition:all .18s ease;max-width:88vw;text-align:center;
+  }
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  .hint{font-size:11.5px;color:var(--muted);margin:2px 0 10px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+    <h1>ReelDeck</h1>
+    <span class="tag" id="brandTag">free · no login</span>
+  </div>
+  <form class="search" id="searchForm" role="search">
+    <input id="searchInput" type="search" placeholder="Search AI stories, tales, drama…" autocomplete="off" enterkeyhint="search">
+    <button type="submit">Go</button>
+  </form>
+</header>
+
+<main>
+  <!-- FEED -->
+  <section id="view-feed" class="on">
+    <div class="chips" id="feedChips"></div>
+    <div class="grid" id="feedGrid"></div>
+    <div id="feedStatus" class="status" hidden></div>
+    <button class="more" id="loadMore" hidden>Load more</button>
+  </section>
+
+  <!-- SAVED -->
+  <section id="view-saved">
+    <div class="tools">
+      <button id="recheckAll">Re-check all</button>
+      <button id="shareList">Share my list</button>
+    </div>
+    <div class="importbar" id="importBar" hidden>
+      <span id="importText"></span>
+      <button id="importYes">Add</button>
+      <button id="importNo">No</button>
+    </div>
+    <div class="grid" id="savedGrid"></div>
+    <div id="savedEmpty" class="status">
+      <div class="big">🔖</div>
+      Nothing saved yet. Tap ☆ on any video, or share a link to ReelDeck.
+    </div>
+  </section>
+
+  <!-- CHANNELS -->
+  <section id="view-channels">
+    <div class="panel">
+      <h2>Add a channel</h2>
+      <p>Paste a Dailymotion channel link (e.g. <b>dailymotion.com/tales-by-jenny</b>) or its user id. It shows up in your feed.</p>
+      <div class="inline">
+        <input id="channelAddInput" placeholder="dailymotion.com/…" autocomplete="off">
+        <button id="channelAddBtn">Add</button>
+      </div>
+      <div class="hint" id="channelAddHint"></div>
+    </div>
+    <div id="channelList"></div>
+  </section>
+
+  <!-- APPS -->
+  <section id="view-apps">
+    <div class="panel">
+      <h2>Open a link</h2>
+      <p>Paste any reel or video link — Facebook, TikTok, Dailymotion or YouTube. It plays here, or opens in the app that owns it.</p>
+      <div class="inline">
+        <input id="pasteInput" placeholder="Paste a link…" autocomplete="off" inputmode="url">
+        <button id="pasteBtn">Open</button>
+      </div>
+      <div class="hint" id="pasteHint"></div>
+    </div>
+
+    <div class="panel">
+      <h2>The apps they already use</h2>
+      <p>Tapping opens the real app if it is installed, otherwise the website. No account needed for Dailymotion or YouTube.</p>
+      <div class="apps" id="appGrid"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Recently opened</h2>
+      <p>Local to this phone.</p>
+      <div class="recent" id="recentList"></div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar" id="tabbar">
+  <button data-tab="feed" class="on">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+    Feed
+  </button>
+  <button data-tab="saved">
+    <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
+    Saved <span class="tabn" id="savedCount"></span>
+  </button>
+  <button data-tab="channels">
+    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+    Channels
+  </button>
+  <button data-tab="apps">
+    <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+    Links
+  </button>
+</nav>
+
+<div class="sheet" id="player" hidden>
+  <div class="inner">
+    <div class="bar">
+      <h3 id="playerTitle">Video</h3>
+      <button class="x" id="playerSave" aria-label="Save to my list">☆</button>
+      <button class="x" id="playerClose" aria-label="Close">✕</button>
+    </div>
+    <div id="playerBody"></div>
+    <div class="actions">
+      <a id="playerOpen" class="primary" target="_blank" rel="noopener">Open in app</a>
+      <button id="playerShare">Share</button>
+      <button id="playerCopy">Copy link</button>
+    </div>
+  </div>
+</div>
+
+<div class="installbar" id="installBar" hidden>
+  <span>📲 Add ReelDeck to the home screen — Chrome ⋮ → Add to Home screen</span>
+  <button id="installClose" aria-label="Dismiss">✕</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  var DM_API = 'https://api.dailymotion.com';
+  var DM_FIELDS = 'id,title,duration,thumbnail_360_url,url,created_time,views_total,owner,owner.screenname';
+
+  // Seeded from channels.json when it is reachable; this list is the offline fallback.
+  var DEFAULT_CHANNELS = [
+    {id:'x6pgob6', name:'Vaughn.Tales', note:'AI drama'},
+    {id:'x6p7rme', name:'Cotton Inlet Pictures', note:'AI drama'},
+    {id:'x6otekq', name:'RubyScreenLanternEpic', note:'AI BL drama'},
+    {id:'x6o7k0q', name:'DovetailCinemaCove', note:'AI drama'},
+    {id:'x6o7le6', name:'GarnetFilmCreek', note:'AI drama'},
+    {id:'x6p7w5y', name:'Cotton Manor Screen', note:'AI drama'},
+    {id:'x6o1ue6', name:'Banyan Veranda Screen', note:'AI drama'},
+    {id:'x6hv7j6', name:'Caelisse.Intrigue', note:'AI drama'},
+    {id:'x6o1whu', name:'Bison Causeway Cinema', note:'AI drama'},
+    {id:'x6o0k8e', name:'Chestnut Corner Tales', note:'AI drama'},
+    {id:'x6o2d2i', name:'Bonfire Annex Narratives', note:'AI drama'},
+    {id:'x5ws75u', name:'Tales by Jenny', note:'AI stories'},
+    {id:'x2u28zr', name:'KIDS CORNER',     note:'AI stories'},
+    {id:'x2zxano', name:'Meow Media',      note:'AI stories'}
+  ];
+  var QUERIES = ['ai stories', 'short drama', 'ai tale'];
+
+  var APPS = [
+    {icon:'📘', name:'Facebook', sub:'AI Stories page', url:'https://www.facebook.com/MsBlue269'},
+    {icon:'🎵', name:'TikTok',   sub:'Search: AI stories', url:'https://www.tiktok.com/search?q=ai%20stories'},
+    {icon:'🎬', name:'Dailymotion', sub:'Search: AI stories', url:'https://www.dailymotion.com/search/ai%20stories/videos'},
+    {icon:'▶️', name:'YouTube',  sub:'Search: AI stories', url:'https://www.youtube.com/results?search_query=ai+stories'}
+  ];
+
+  // ---------- tiny helpers ----------
+  var $ = function(id){ return document.getElementById(id); };
+  function store(key, val){
+    try{
+      if(arguments.length === 1){ var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; }
+      localStorage.setItem(key, JSON.stringify(val));
+    }catch(e){ return null; }
+  }
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function dur(sec){
+    sec = Math.max(0, Math.round(Number(sec) || 0));
+    var h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+    return (h ? h + ':' + String(m).padStart(2,'0') : String(m)) + ':' + String(s).padStart(2,'0');
+  }
+  function views(n){
+    n = Number(n) || 0;
+    if(n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+    if(n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+    return String(n);
+  }
+  function ago(ts){
+    if(!ts) return '';
+    var d = Date.now()/1000 - Number(ts);
+    if(d < 3600) return Math.max(1, Math.round(d/60)) + 'm ago';
+    if(d < 86400) return Math.round(d/3600) + 'h ago';
+    if(d < 2592000) return Math.round(d/86400) + 'd ago';
+    return Math.round(d/2592000) + 'mo ago';
+  }
+  var toastTimer;
+  function toast(msg){
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove('on'); }, 1800);
+  }
+
+  // ---------- state ----------
+  var follows = store('rd.follows') || [];
+  var saved = store('rd.saved') || [];
+  var pendingImport = [];
+  var state = {
+    tab: 'feed',
+    query: store('rd.query') || 'ai stories',
+    mode: follows.length ? 'following' : 'all',
+    page: 1,
+    loading: false,
+    items: [],
+    longOnly: store('rd.long') === true
+  };
+
+  function channelById(id){
+    for(var i=0;i<DEFAULT_CHANNELS.length;i++) if(DEFAULT_CHANNELS[i].id === id) return DEFAULT_CHANNELS[i];
+    var extra = store('rd.extraChannels') || [];
+    for(var j=0;j<extra.length;j++) if(extra[j].id === id) return extra[j];
+    return {id:id, name:store('rd.name.' + id) || id, note:'Dailymotion'};
+  }
+  function allChannels(){
+    var extra = store('rd.extraChannels') || [];
+    return DEFAULT_CHANNELS.concat(extra);
+  }
+
+  // ---------- Dailymotion data ----------
+  function dmUrl(path, params){
+    var u = new URL(DM_API + path);
+    Object.keys(params).forEach(function(k){ u.searchParams.set(k, params[k]); });
+    return u.toString();
+  }
+  function normalizeDM(v){
+    return {
+      platform: 'dailymotion',
+      id: v.id,
+      title: v.title || 'Untitled',
+      duration: v.duration || 0,
+      thumb: v.thumbnail_360_url || '',
+      url: v.url || ('https://www.dailymotion.com/video/' + v.id),
+      created: v.created_time || 0,
+      views: v.views_total || 0,
+      channel: v['owner.screenname'] || '',
+      channelId: v.owner || ''
+    };
+  }
+  function getJSON(url){
+    return fetch(url, {headers:{'Accept':'application/json'}}).then(function(r){
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+  function searchDM(q, page){
+    return getJSON(dmUrl('/videos', {
+      search: q, sort: 'recent', limit: 24, page: page, fields: DM_FIELDS
+    })).then(function(d){ return (d.list || []).map(normalizeDM); });
+  }
+  function channelDM(id, page){
+    return getJSON(dmUrl('/user/' + id + '/videos', {
+      sort: 'recent', limit: 18, page: page, fields: DM_FIELDS
+    })).then(function(d){ return (d.list || []).map(normalizeDM); });
+  }
+
+  // ---------- rendering ----------
+  function cardHTML(v){
+    return '<button class="card" data-platform="' + v.platform + '" data-id="' + esc(v.id) + '">' +
+      '<div class="thumb">' +
+        (v.thumb
+          ? '<img loading="lazy" src="' + esc(v.thumb) + '" alt="">'
+          : '<div class="ph">🎬</div>') +
+        '<span class="badge">' + esc(v.platform === 'dailymotion' ? 'DM' : v.platform) + '</span>' +
+        '<span class="dur">' + dur(v.duration) + '</span>' +
+      '</div>' +
+      '<div class="meta">' +
+        '<span class="title">' + esc(v.title) + '</span>' +
+        '<span class="sub">' + esc(v.channel || '') + (v.views ? ' · ' + views(v.views) + ' views' : '') + (v.created ? ' · ' + ago(v.created) : '') + '</span>' +
+      '</div>' +
+    '</button>';
+  }
+
+  function skelHTML(n){
+    var out = '';
+    for(var i=0;i<n;i++) out += '<div class="skel"><div class="thumb"></div><div class="meta"><span class="title">&nbsp;</span><span class="sub">&nbsp;</span></div></div>';
+    return out;
+  }
+
+  function renderFeed(append){
+    var grid = $('feedGrid'), status = $('feedStatus'), more = $('loadMore');
+    var items = state.items.filter(function(v){ return !state.longOnly || v.duration >= 600; });
+    grid.innerHTML = (append ? grid.innerHTML : '') + items.map(cardHTML).join('');
+    status.hidden = true;
+    more.hidden = items.length < 6;
+    if(!items.length && state.items.length){
+      setStatus('No 10-minute videos in this batch. Switch to All AI stories for the long ones.');
+    }
+  }
+
+  function setStatus(msg, isErr, retryFn){
+    var s = $('feedStatus');
+    s.hidden = false;
+    s.className = 'status' + (isErr ? ' err' : '');
+    s.innerHTML = '<div class="big">' + (isErr ? '⚠️' : '🎬') + '</div>' + esc(msg) +
+      (retryFn ? '<br><button class="retry" id="retryBtn">Try again</button>' : '');
+    if(retryFn) $('retryBtn').onclick = retryFn;
+  }
+
+  function qLabel(q){
+    var m = {'ai stories':'AI stories', 'short drama':'Short drama', 'ai tale':'AI tales'};
+    return m[q] || (q.charAt(0).toUpperCase() + q.slice(1));
+  }
+
+  function renderChips(){
+    var html = '<button class="chip' + (state.mode === 'following' ? ' on' : '') + '" data-chip="following">Following' +
+      (follows.length ? ' <span class="n">' + follows.length + '</span>' : '') + '</button>';
+    html += QUERIES.map(function(q){
+      var on = state.mode === 'all' && state.query === q;
+      return '<button class="chip' + (on ? ' on' : '') + '" data-query="' + esc(q) + '">' + esc(qLabel(q)) + '</button>';
+    }).join('');
+    html += '<button class="chip' + (state.longOnly ? ' on' : '') + '" data-chip="long">10 min+</button>';
+    $('feedChips').innerHTML = html;
+  }
+
+  function loadFeed(reset){
+    if(state.loading) return;
+    if(state.mode === 'following' && !follows.length){
+      $('feedGrid').innerHTML = '';
+      $('loadMore').hidden = true;
+      setStatus('Follow a channel on the Channels tab, or switch to All AI stories.');
+      return;
+    }
+    if(reset){
+      state.page = 1;
+      state.items = [];
+      $('feedGrid').innerHTML = skelHTML(8);
+      $('loadMore').hidden = true;
+      $('feedStatus').hidden = true;
+    }
+    state.loading = true;
+
+    var work;
+    if(state.mode === 'following' && follows.length){
+      work = Promise.all(follows.slice(0, 8).map(function(id){
+        return channelDM(id, state.page).catch(function(){ return []; });
+      })).then(function(lists){
+        var merged = [].concat.apply([], lists);
+        merged.sort(function(a,b){ return b.created - a.created; });
+        return merged;
+      });
+    }else{
+      work = searchDM(state.query, state.page);
+    }
+
+    work.then(function(items){
+      state.items = reset ? items : state.items.concat(items);
+      state.loading = false;
+      if(!state.items.length){
+        $('feedGrid').innerHTML = '';
+        setStatus(state.mode === 'following'
+          ? 'Follow a channel first, or switch to All AI stories.'
+          : 'Nothing came back for “' + state.query + '”. Try another word.');
+        return;
+      }
+      renderFeed(!reset);
+    }).catch(function(err){
+      state.loading = false;
+      if(reset) $('feedGrid').innerHTML = '';
+      setStatus('Could not reach Dailymotion (' + err.message + ').', true, function(){ loadFeed(true); });
+    });
+  }
+
+  // ---------- channels ----------
+  function renderChannels(){
+    var list = allChannels();
+    $('channelList').innerHTML = list.map(function(c){
+      var on = follows.indexOf(c.id) >= 0;
+      return '<div class="row">' +
+        '<div class="av">' + esc((c.name || '?').trim().charAt(0).toUpperCase()) + '</div>' +
+        '<div class="who"><b>' + esc(c.name) + '</b><span>' + esc(c.note || 'Dailymotion') + '</span></div>' +
+        '<button class="follow' + (on ? ' on' : '') + '" data-follow="' + esc(c.id) + '">' + (on ? 'Following' : 'Follow') + '</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  function toggleFollow(id){
+    var i = follows.indexOf(id);
+    if(i >= 0) follows.splice(i,1); else follows.push(id);
+    store('rd.follows', follows);
+    if(state.mode === 'following') loadFeed(true);
+    renderChannels();
+    renderChips();
+    toast(i >= 0 ? 'Unfollowed' : 'Added to Following');
+  }
+
+  function parseChannelInput(raw){
+    var s = raw.trim();
+    if(!s) return null;
+    if(/^x[a-z0-9]+$/i.test(s)) return {id:s, name:s, note:'Dailymotion'};
+    var m = s.match(/dailymotion\.com\/(?:user\/)?([A-Za-z0-9_-]+)/);
+    if(m) return {id:m[1], name:m[1], note:'Dailymotion'};
+    return null;
+  }
+
+  function addChannel(){
+    var parsed = parseChannelInput($('channelAddInput').value);
+    var hint = $('channelAddHint');
+    if(!parsed){ hint.textContent = 'That does not look like a Dailymotion link.'; return; }
+    // Confirm the channel exists, and take its real display name.
+    getJSON(DM_API + '/user/' + encodeURIComponent(parsed.id) + '?fields=id,screenname,username').then(function(u){
+      var ch = {id:u.id, name:u.screenname || u.username || u.id, note:'Dailymotion'};
+      var extra = store('rd.extraChannels') || [];
+      var exists = extra.some(function(c){ return c.id === ch.id; }) || DEFAULT_CHANNELS.some(function(c){ return c.id === ch.id; });
+      if(!exists){ extra.push(ch); store('rd.extraChannels', extra); }
+      if(follows.indexOf(ch.id) < 0){ follows.push(ch.id); store('rd.follows', follows); }
+      $('channelAddInput').value = '';
+      hint.textContent = 'Added ' + ch.name + '.';
+      renderChannels(); renderChips();
+      toast('Added ' + ch.name);
+    }).catch(function(){
+      hint.textContent = 'No Dailymotion channel with that name.';
+    });
+  }
+
+  // ---------- apps + paste ----------
+  function renderApps(){
+    $('appGrid').innerHTML = APPS.map(function(a){
+      return '<a class="app" href="' + esc(a.url) + '" target="_blank" rel="noopener">' +
+        '<div class="ico">' + a.icon + '</div><b>' + esc(a.name) + '</b><span>' + esc(a.sub) + '</span></a>';
+    }).join('');
+  }
+
+  function renderRecent(){
+    var r = store('rd.recent') || [];
+    var el = $('recentList');
+    if(!r.length){ el.innerHTML = '<div class="hint">Nothing yet.</div>'; return; }
+    el.innerHTML = r.map(function(x){
+      return '<a class="r" href="' + esc(x.url) + '" target="_blank" rel="noopener">' +
+        (x.thumb ? '<img src="' + esc(x.thumb) + '" alt="">' : '<div class="ph2">🎬</div>') +
+        '<div class="t"><b>' + esc(x.title) + '</b><span>' + esc(x.platform || '') + '</span></div></a>';
+    }).join('');
+  }
+  function pushRecent(item){
+    var r = store('rd.recent') || [];
+    r = r.filter(function(x){ return x.url !== item.url; });
+    r.unshift({title:item.title, url:item.url, thumb:item.thumb, platform:item.platform});
+    store('rd.recent', r.slice(0, 12));
+    renderRecent();
+  }
+
+  // ---------- saved list ----------
+  function shortPlatform(p){
+    return ({dailymotion:'DM', youtube:'YT', tiktok:'TT', facebook:'FB'})[p] || 'LINK';
+  }
+  function codePlatform(p){
+    return ({dailymotion:'dm', youtube:'yt', tiktok:'tt', facebook:'fb'})[p] || 'u';
+  }
+  function savedKey(it){ return it.platform + ':' + it.id; }
+  function isSaved(it){ return saved.some(function(s){ return savedKey(s) === savedKey(it); }); }
+
+  function b64urlEncode(str){
+    return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+  function b64urlDecode(s){
+    s = s.replace(/-/g,'+').replace(/_/g,'/');
+    while(s.length % 4) s += '=';
+    return decodeURIComponent(escape(atob(s)));
+  }
+
+  function saveItem(it, quiet){
+    if(isSaved(it)) return;
+    saved.unshift({
+      platform: it.platform, id: it.id,
+      url: it.url || canonicalUrl(it.platform, it.id),
+      title: it.title || '', thumb: it.thumb || '', duration: it.duration || 0,
+      status: 'checking', checked: 0, added: Math.floor(Date.now()/1000)
+    });
+    store('rd.saved', saved);
+    renderSaved(); renderSaveBtn();
+    if(!quiet) toast('Saved to your list');
+    checkItem(savedKey(it));
+  }
+
+  function unsave(it){
+    saved = saved.filter(function(s){ return savedKey(s) !== savedKey(it); });
+    store('rd.saved', saved);
+    renderSaved(); renderSaveBtn();
+    toast('Removed');
+  }
+
+  function setStatus(key, status, fields){
+    saved.forEach(function(s){
+      if(savedKey(s) === key){
+        s.status = status;
+        s.checked = Math.floor(Date.now()/1000);
+        if(fields) Object.keys(fields).forEach(function(k){ if(fields[k]) s[k] = fields[k]; });
+      }
+    });
+    store('rd.saved', saved);
+  }
+
+  // Dailymotion and YouTube can be verified from the browser. TikTok and Facebook cannot,
+  // so those are marked "in app" instead of pretending they were checked.
+  function checkItem(key){
+    var it = saved.filter(function(s){ return savedKey(s) === key; })[0];
+    if(!it) return Promise.resolve();
+    var done = function(status, fields){
+      setStatus(key, status, fields);
+      if(state.tab === 'saved') renderSaved();
+    };
+    if(it.platform === 'dailymotion'){
+      return getJSON(dmUrl('/video/' + it.id, {fields: DM_FIELDS}))
+        .then(function(v){ done('ok', {title:v.title, thumb:v.thumbnail_360_url, duration:v.duration}); })
+        .catch(function(){ done('dead'); });
+    }
+    if(it.platform === 'youtube'){
+      return fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(canonicalUrl('youtube', it.id)))
+        .then(function(r){ if(!r.ok) throw new Error('x'); return r.json(); })
+        .then(function(d){ done('ok', {title:d.title, thumb:d.thumbnail_url}); })
+        .catch(function(){ done('dead'); });
+    }
+    if(it.platform === 'tiktok'){
+      return fetch('https://www.tiktok.com/oembed?url=' + encodeURIComponent(canonicalUrl('tiktok', it.id)))
+        .then(function(r){ if(!r.ok) throw new Error('x'); return r.json(); })
+        .then(function(d){ done('ok', {title:d.title, thumb:d.thumbnail_url}); })
+        .catch(function(){ done('app'); });
+    }
+    done('app');
+    return Promise.resolve();
+  }
+
+  function checkAll(){
+    if(!saved.length){ toast('Nothing saved yet'); return; }
+    toast('Checking ' + saved.length + ' links…');
+    var chain = Promise.resolve();
+    saved.map(savedKey).forEach(function(k){ chain = chain.then(function(){ return checkItem(k); }); });
+    chain.then(function(){ renderSaved(); toast('Checked'); });
+  }
+
+  function renderSaved(){
+    var grid = $('savedGrid'), empty = $('savedEmpty');
+    $('savedCount').textContent = saved.length ? String(saved.length) : '';
+    if(!saved.length){ grid.innerHTML = ''; empty.hidden = false; return; }
+    empty.hidden = true;
+    grid.innerHTML = saved.map(function(s, i){
+      var st = s.status === 'ok' ? '<span class="state ok">works</span>'
+        : s.status === 'dead' ? '<span class="state dead">gone</span>'
+        : s.status === 'checking' ? '<span class="state checking">…</span>'
+        : '<span class="state app">in app</span>';
+      return '<button class="card" data-saved="' + i + '">' +
+        '<div class="thumb">' +
+          (s.thumb ? '<img loading="lazy" src="' + esc(s.thumb) + '" alt="">' : '<div class="ph">🎬</div>') +
+          '<span class="badge">' + esc(shortPlatform(s.platform)) + '</span>' + st +
+          '<span class="dur">' + dur(s.duration || 0) + '</span>' +
+          '<span class="del" data-del="' + i + '">✕</span>' +
+        '</div>' +
+        '<div class="meta">' +
+          '<span class="title">' + esc(s.title || 'Saved video') + '</span>' +
+          '<span class="sub">' + esc(s.checked ? 'checked ' + ago(s.checked) : 'not checked yet') + '</span>' +
+        '</div>' +
+      '</button>';
+    }).join('');
+  }
+
+  function renderSaveBtn(){
+    var b = $('playerSave');
+    if(!b) return;
+    b.textContent = (current && isSaved(current)) ? '★' : '☆';
+  }
+
+  function showImport(list){
+    pendingImport = list;
+    $('importText').textContent = 'Add ' + list.length + ' video' + (list.length > 1 ? 's' : '') + ' from a shared list?';
+    $('importBar').hidden = false;
+    showTab('saved');
+  }
+
+  function parseLink(raw){
+    var s = raw.trim();
+    if(!s) return null;
+    var m;
+    if((m = s.match(/facebook\.com\/(?:reel|videos?)\/(\d+)/i))) return {platform:'facebook', id:m[1], url:'https://www.facebook.com/reel/' + m[1]};
+    if((m = s.match(/tiktok\.com\/.*\/video\/(\d+)/i))) return {platform:'tiktok', id:m[1], url:'https://www.tiktok.com/@/video/' + m[1]};
+    if((m = s.match(/dailymotion\.com\/video\/([a-z0-9]+)/i))) return {platform:'dailymotion', id:m[1], url:'https://www.dailymotion.com/video/' + m[1]};
+    if((m = s.match(/dai\.ly\/([a-z0-9]+)/i))) return {platform:'dailymotion', id:m[1], url:'https://www.dailymotion.com/video/' + m[1]};
+    if((m = s.match(/youtube\.com\/shorts\/([\w-]+)/i))) return {platform:'youtube', id:m[1], url:'https://www.youtube.com/shorts/' + m[1]};
+    if((m = s.match(/youtu\.be\/([\w-]+)/i))) return {platform:'youtube', id:m[1], url:'https://youtu.be/' + m[1]};
+    if((m = s.match(/[?&]v=([\w-]+)/i))) return {platform:'youtube', id:m[1], url:'https://www.youtube.com/watch?v=' + m[1]};
+    return null;
+  }
+
+  function canonicalUrl(platform, id){
+    if(platform === 'facebook') return 'https://www.facebook.com/reel/' + id;
+    if(platform === 'tiktok') return 'https://www.tiktok.com/@/video/' + id;
+    if(platform === 'dailymotion') return 'https://www.dailymotion.com/video/' + id;
+    return 'https://www.youtube.com/watch?v=' + id;
+  }
+
+  // A ReelDeck link resolves in any sister's browser: #dm/<id>, #fb/<id>, #tt/<id>, #yt/<id>.
+  function reelDeckLink(item){
+    var k = ({facebook:'fb', tiktok:'tt', dailymotion:'dm', youtube:'yt'})[item.platform] || 'u';
+    return location.origin + location.pathname + '#' + k + '/' + encodeURIComponent(item.id);
+  }
+
+  function parseHash(){
+    var h = (location.hash || '').replace(/^#/, '');
+    if(!h) return;
+    var parts = h.split('/');
+    if(parts[0] === 'import' && parts[1]){
+      var list = null;
+      try{ list = JSON.parse(b64urlDecode(parts[1])); }catch(e){}
+      if(list && list.length) showImport(list);
+      return;
+    }
+    if(parts[0] === 'u' && parts[1]){ openLink(decodeURIComponent(parts[1]), true); return; }
+    var map = {fb:'facebook', tt:'tiktok', dm:'dailymotion', yt:'youtube'};
+    var p = map[parts[0]];
+    if(p && parts[1]){
+      var id = decodeURIComponent(parts[1]);
+      openItem({platform:p, id:id, url:canonicalUrl(p, id), title:'Shared video', duration:0, thumb:''}, {auto:true});
+    }
+  }
+
+  function copyText(text, msg){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ toast(msg || 'Copied'); }, function(){ toast(text); });
+    }else{ toast(text); }
+  }
+
+  function openLink(raw, auto){
+    var p = parseLink(raw);
+    var hint = $('pasteHint');
+    if(!p){ hint.textContent = 'Unrecognised link. Facebook reel, TikTok video, Dailymotion video or YouTube link.'; return; }
+    hint.textContent = '';
+
+    if(p.platform === 'dailymotion'){
+      getJSON(dmUrl('/video/' + p.id, {fields: DM_FIELDS})).then(function(v){
+        openItem(normalizeDM(v), {auto:auto});
+      }).catch(function(){ openItem({platform:'dailymotion', id:p.id, url:p.url, title:'Dailymotion video', duration:0, thumb:''}, {auto:auto}); });
+      return;
+    }
+    openItem({platform:p.platform, id:p.id, url:p.url, title:'Open link', duration:0, thumb:''}, {auto:auto});
+  }
+
+  // ---------- player ----------
+  var current = null;
+  function embedHTML(item){
+    if(item.platform === 'dailymotion'){
+      return '<div class="frame"><iframe src="https://www.dailymotion.com/embed/video/' + encodeURIComponent(item.id) + '?autoplay=1&queue-enable=false" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>';
+    }
+    if(item.platform === 'tiktok'){
+      return '<div class="frame"><iframe src="https://www.tiktok.com/player/v1/' + encodeURIComponent(item.id) + '?autoplay=1" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>';
+    }
+    if(item.platform === 'youtube'){
+      return '<div class="frame"><iframe src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(item.id) + '?autoplay=1&playsinline=1" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>';
+    }
+    if(item.platform === 'facebook'){
+      return '<div class="frame wide"><iframe src="https://www.facebook.com/plugins/video.php?href=' + encodeURIComponent(item.url) + '&show_text=false&autoplay=1" allow="autoplay; fullscreen" allowfullscreen></iframe></div>' +
+        '<div class="fallback">If the frame stays blank, Facebook wants a login for this one. Use <b>Open in app</b> below — the phone plays it in the Facebook app or browser.</div>';
+    }
+    return '<div class="fallback">No inline player for this link. Use <b>Open in app</b>.</div>';
+  }
+
+  function openItem(item, opts){
+    current = item;
+    $('playerTitle').textContent = item.title || 'Video';
+    $('playerBody').innerHTML = embedHTML(item);
+    $('playerOpen').href = item.url;
+    $('player').hidden = false;
+    document.body.style.overflow = 'hidden';
+    pushRecent(item);
+    renderSaveBtn();
+    if(opts && opts.auto) saveItem(item, true);
+  }
+  function closePlayer(){
+    $('player').hidden = true;
+    $('playerBody').innerHTML = '';
+    document.body.style.overflow = '';
+    current = null;
+  }
+
+  // ---------- tabs ----------
+  function showTab(name){
+    state.tab = name;
+    ['feed','saved','channels','apps'].forEach(function(t){
+      $('view-' + t).classList.toggle('on', t === name);
+    });
+    var btns = $('tabbar').querySelectorAll('button');
+    for(var i=0;i<btns.length;i++) btns[i].classList.toggle('on', btns[i].getAttribute('data-tab') === name);
+    if(name === 'saved') renderSaved();
+    if(name === 'channels') renderChannels();
+    if(name === 'apps'){ renderApps(); renderRecent(); }
+  }
+
+  // ---------- wiring ----------
+  $('searchForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var q = $('searchInput').value.trim();
+    if(!q) return;
+    state.query = q; store('rd.query', q);
+    state.mode = 'all';
+    showTab('feed');
+    renderChips();
+    loadFeed(true);
+  });
+
+  $('feedChips').addEventListener('click', function(e){
+    var q = e.target.closest('[data-query]');
+    if(q){
+      state.query = q.getAttribute('data-query');
+      state.mode = 'all';
+      store('rd.query', state.query);
+      renderChips();
+      loadFeed(true);
+      return;
+    }
+    var b = e.target.closest('[data-chip]');
+    if(!b) return;
+    var k = b.getAttribute('data-chip');
+    if(k === 'long'){
+      state.longOnly = !state.longOnly;
+      store('rd.long', state.longOnly);
+      renderChips();
+      renderFeed(false);
+      return;
+    }
+    state.mode = k;
+    renderChips();
+    loadFeed(true);
+  });
+
+  $('feedGrid').addEventListener('click', function(e){
+    var c = e.target.closest('.card');
+    if(!c) return;
+    var id = c.getAttribute('data-id');
+    var item = state.items.filter(function(x){ return x.id === id; })[0];
+    if(item) openItem(item);
+  });
+
+  $('loadMore').addEventListener('click', function(){
+    state.page += 1;
+    loadFeed(false);
+  });
+
+  $('channelList').addEventListener('click', function(e){
+    var b = e.target.closest('[data-follow]');
+    if(!b) return;
+    toggleFollow(b.getAttribute('data-follow'));
+  });
+
+  $('channelAddBtn').addEventListener('click', addChannel);
+  $('channelAddInput').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); addChannel(); } });
+
+  $('pasteBtn').addEventListener('click', function(){ openLink($('pasteInput').value); });
+  $('pasteInput').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); openLink($('pasteInput').value); } });
+
+  $('playerClose').addEventListener('click', closePlayer);
+  $('player').addEventListener('click', function(e){ if(e.target === $('player')) closePlayer(); });
+  $('playerCopy').addEventListener('click', function(){
+    if(!current) return;
+    copyText(reelDeckLink(current), 'ReelDeck link copied');
+  });
+  $('playerShare').addEventListener('click', function(){
+    if(!current) return;
+    var link = reelDeckLink(current);
+    if(navigator.share){
+      navigator.share({title: current.title || 'ReelDeck', text: current.title || '', url: link}).catch(function(){});
+    }else{
+      copyText(link, 'ReelDeck link copied — paste it to anyone');
+    }
+  });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !$('player').hidden) closePlayer(); });
+
+  $('tabbar').addEventListener('click', function(e){
+    var b = e.target.closest('[data-tab]');
+    if(b) showTab(b.getAttribute('data-tab'));
+  });
+
+  // ---------- saved list wiring ----------
+  $('savedGrid').addEventListener('click', function(e){
+    var del = e.target.closest('[data-del]');
+    if(del){
+      var d = saved[Number(del.getAttribute('data-del'))];
+      if(d) unsave(d);
+      return;
+    }
+    var c = e.target.closest('[data-saved]');
+    if(!c) return;
+    var it = saved[Number(c.getAttribute('data-saved'))];
+    if(it) openItem(it);
+  });
+
+  $('playerSave').addEventListener('click', function(){
+    if(!current) return;
+    if(isSaved(current)) unsave(current); else saveItem(current);
+    renderSaveBtn();
+  });
+
+  $('recheckAll').addEventListener('click', checkAll);
+
+  $('shareList').addEventListener('click', function(){
+    if(!saved.length){ toast('Nothing saved yet'); return; }
+    var compact = saved.map(function(s){ return {p: codePlatform(s.platform), i: s.id, t: (s.title || '').slice(0, 90)}; });
+    var link = location.origin + location.pathname + '#import/' + b64urlEncode(JSON.stringify(compact));
+    if(navigator.share){
+      navigator.share({title: 'My ReelDeck list', text: saved.length + ' videos', url: link}).catch(function(){});
+    }else{
+      copyText(link, 'List link copied — send it to anyone');
+    }
+  });
+
+  $('importYes').addEventListener('click', function(){
+    var map = {dm:'dailymotion', yt:'youtube', tt:'tiktok', fb:'facebook'};
+    pendingImport.forEach(function(x){
+      var p = map[x.p];
+      if(p) saveItem({platform:p, id:x.i, url:canonicalUrl(p, x.i), title:x.t || ''}, true);
+    });
+    pendingImport = [];
+    $('importBar').hidden = true;
+    renderSaved();
+    toast('List added');
+  });
+  $('importNo').addEventListener('click', function(){
+    pendingImport = [];
+    $('importBar').hidden = true;
+  });
+
+  // ---------- boot ----------
+  function boot(){
+    $('searchInput').value = state.query;
+    renderChips();
+    loadFeed(true);
+
+    // Android share sheet: "Share → ReelDeck" lands here as ?share=<url>
+    renderSaved();
+
+    var shared = new URLSearchParams(location.search).get('share');
+    if(shared){
+      history.replaceState(null, '', location.pathname + location.hash);
+      setTimeout(function(){ openLink(shared, true); }, 80);
+    }else{
+      parseHash();
+      var tabParam = new URLSearchParams(location.search).get('tab');
+      if(tabParam && ['feed','channels','apps'].indexOf(tabParam) >= 0) showTab(tabParam);
+    }
+
+    var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    if(!standalone && store('rd.installDismissed') !== true){
+      $('installBar').hidden = false;
+    }
+  }
+
+  $('installClose').addEventListener('click', function(){
+    $('installBar').hidden = true;
+    store('rd.installDismissed', true);
+  });
+
+  fetch('channels.json', {cache:'no-store'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){
+      if(d && d.channels && d.channels.length){
+        DEFAULT_CHANNELS = d.channels;
+        if(d.queries && d.queries.length) QUERIES = d.queries;
+      }
+    })
+    .catch(function(){})
+    .then(boot);
+
+  window.addEventListener('hashchange', parseHash);
+
+  if('serviceWorker' in navigator && location.protocol === 'https:'){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  }
+})();
+</script>
+</body>
+</html>
