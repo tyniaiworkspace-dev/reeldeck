@@ -144,6 +144,18 @@ qr-lan.png            QR for the LAN copy
 serve.sh              python3 -m http.server 8788 (local copy)
 ```
 
+## Throwaway inbox
+
+The Links tab can make a disposable address (Guerrilla Mail's public API — no key, no signup,
+`Access-Control-Allow-Origin: *`). Tap **Make it**, copy the address, give it to whatever asks.
+Mail appears in the page within ten seconds; the address dies after an hour and can be extended
+or forgotten. Nothing is tied to the phone or to a person.
+
+If a site just wants an address and never sends a code, any address works — the page is only
+needed when a code or a link actually arrives. For mail that should reach a real inbox,
+**Gmail plus** (`name+anything@gmail.com`) and **DuckDuckGo's `@duck.com`** aliases are free and
+revocable. `FREE-STACK.md` lists the rest of the free services.
+
 ## Local copy
 
 ```bash
