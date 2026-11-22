@@ -131,6 +131,7 @@
   .helplist{margin:0 0 10px;padding-left:18px;font-size:12.5px;color:var(--muted);line-height:1.55}
   .helplist li{margin-bottom:7px}
   .helplist b{color:var(--text)}
+  .helplist a{color:var(--accent);text-decoration:underline}
 
   .apps{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
   @media(min-width:620px){.apps{grid-template-columns:repeat(4,1fr)}}
@@ -315,6 +316,17 @@
     </div>
 
     <div class="panel">
+      <h2>Keep a copy — no account, ever</h2>
+      <p>A saved file never asks for an email, never expires and plays with no signal. Three ways to get one:</p>
+      <ul class="helplist">
+        <li><b>Save a copy.</b> Open any video and tap <b>Save a copy</b>. The phone's share sheet lists any downloader app you have. Pick it and the <b>whole</b> episode downloads.</li>
+        <li><b>Downloader apps.</b> <a href="https://f-droid.org/packages/com.deniscerri.ytdl/" target="_blank" rel="noopener">YTDLnis</a> or <a href="https://f-droid.org/packages/com.junkfood.seal/" target="_blank" rel="noopener">Seal</a> — both free, no account, no ads. Paste a link, get the file.</li>
+        <li><b>Send it over.</b> Tap <b>Share</b> → WhatsApp to the family organiser. They run it through the home ripper and send the file back.</li>
+      </ul>
+      <p>Watching inside ReelDeck also needs no account. The next panel is only for when Dailymotion itself blocks a link.</p>
+    </div>
+
+    <div class="panel">
       <h2>If it asks for an email</h2>
       <p>The player inside ReelDeck never needs an account. If the Dailymotion site or app asks anyway, these four checks tell you what is causing it:</p>
       <ul class="helplist">
@@ -323,7 +335,7 @@
         <li><b>Desktop site.</b> Chrome ⋮ → Desktop site. If it plays, the prompt is the mobile layout.</li>
         <li><b>Another copy.</b> Tap “Find the full version”. The same story on another channel often plays.</li>
       </ul>
-      <p>If all four still ask, Dailymotion is testing a sign-in on that device. Stay in the inline player and use another copy.</p>
+      <p>If all four still ask, stop fighting it — use <b>Save a copy</b> above. A file on the phone has no login screen.</p>
     </div>
 
     <div class="panel">
@@ -364,6 +376,7 @@
     <div id="playerBody"></div>
     <div class="actions">
       <a id="playerOpen" class="primary" target="_blank" rel="noopener">Open in app</a>
+      <button id="playerSaveFile">Save a copy</button>
       <button id="playerShare">Share</button>
       <button id="playerCopy">Copy link</button>
     </div>
@@ -1328,6 +1341,19 @@
     }
   });
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !$('player').hidden) closePlayer(); });
+
+  $('playerSaveFile').addEventListener('click', function(){
+    if(!current) return;
+    // The share sheet lists any downloader app on the phone (YTDLnis, Seal, …),
+    // which pulls the file straight from the source. No account, no Dailymotion page.
+    var src = current.url || canonicalUrl(current.platform, current.id);
+    var label = current.title || 'Video';
+    if(navigator.share){
+      navigator.share({title: label, text: label, url: src}).catch(function(){});
+    }else{
+      copyText(src, 'Link copied — paste it into a downloader app to keep the file');
+    }
+  });
 
   $('tabbar').addEventListener('click', function(e){
     var b = e.target.closest('[data-tab]');

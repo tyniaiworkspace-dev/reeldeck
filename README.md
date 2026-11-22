@@ -66,6 +66,37 @@ uses an `intent://…package=com.android.chrome` link, which hands the same vide
 Chrome instead of the app. No account is needed there. The button falls back to the normal
 link if Chrome is missing.
 
+If the site asks on a particular phone anyway, the answer that always works is to stop
+using the site: **Save a copy** in the player hands the source link to the phone's share
+sheet, where any downloader app (YTDLnis, Seal) turns it into a file. A file has no login
+screen and plays with no signal.
+
+## Ripping a copy at home
+
+`rip.sh` saves any Facebook / Dailymotion / TikTok / YouTube link as a single mp4 in
+`~/Videos/reeldeck`. Full episodes arrive whole — the duration is read from the source, so a
+72-minute post becomes a 72-minute file.
+
+```bash
+./rip.sh "https://www.dailymotion.com/video/xbyvvxa"   # one link
+./rip.sh xbyvvxa xbyw0cm                               # bare ids work too
+./rip.sh -f links.txt                                  # one link per line, walk away
+./rip.sh --low <link>                                  # 360p, ~240 MB instead of ~1.1 GB
+./rip.sh --out /path/to/folder <link>                  # somewhere other than ~/Videos/reeldeck
+```
+
+Runs 16 downloads in parallel per video (~4 minutes for a 72-minute 720p episode). Already
+saved videos are skipped, so a batch can be re-run safely. Next to each mp4 sits a
+`.info.json` with the title, channel, duration and source URL.
+
+Verified end to end on 2026-11-23: `xbyvvxa` → 1.08 GiB, 72.7 min, h264 544x960 + AAC,
+decodes clean. The source claims 4360 s, so the file is the complete episode.
+
+Two limits worth knowing: disk (a 720p library costs ~1.1 GB per episode, so use `--low`
+for bulk) and the social platforms. Facebook and TikTok need cookies for most posts —
+export them once with `yt-dlp --cookies-from-browser chrome` on a machine where you are
+logged in.
+
 ## Link checking
 
 - **Dailymotion and YouTube** are verified in the browser: title, thumbnail and duration are
