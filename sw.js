@@ -40,6 +40,21 @@ self.addEventListener('fetch', (e) => {
   if (url.hostname === 'api.dailymotion.com') return; // always live
   if (e.request.method !== 'GET') return;
 
+  // The catalogue is the whole shelf in one file (~500 KB gzipped). Serve the cached copy
+  // the instant the app opens and refresh it behind the screen, so a cold open on a weak
+  // signal shows every story instead of a spinner.
+  if (url.pathname.endsWith('/catalog.json')) {
+    e.respondWith((async () => {
+      const c = await caches.open(CACHE);
+      const hit = await c.match(e.request);
+      const net = fetch(e.request)
+        .then((r) => { if (r.ok) c.put(e.request, r.clone()); return r; })
+        .catch(() => hit);
+      return hit || net;
+    })());
+    return;
+  }
+
   e.respondWith(
     fetch(e.request)
       .then((r) => {

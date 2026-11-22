@@ -6,15 +6,15 @@ working-link check, and accepts links straight from the Android share sheet.
 
 **Hosted free:** https://tyniaiworkspace-dev.github.io/reeldeck/
 **Home Wi-Fi copy:** http://192.168.8.221:8788 (runs on the PC, `systemctl --user status reeldeck`)
-**Version:** 0.7.1 — see [CHANGELOG.md](CHANGELOG.md)
+**Version:** 0.8.0 — see [CHANGELOG.md](CHANGELOG.md)
 
 No accounts, no logins, no Tailscale, nothing to install. Playback uses the platform's own
 player; `rip.sh` keeps a file for anything that gets walled.
 
 ## The shelf
 
-The Feed opens on a catalogue instead of a search box: **5,989 stories, 2,315 of them
-complete**, 7,656 hours, built from seeded Dailymotion channels plus eight keyword crawls.
+The Feed opens on a catalogue instead of a search box: **6,870 stories, 2,617 of them
+complete**, 9,895 hours, built from seeded Dailymotion channels plus sixteen keyword crawls.
 Cards show the poster, the duration and a `FULL` badge when the upload is the whole story.
 Chips filter to complete stories (the default), 20 minutes and up, or channels you follow;
 the search box filters instantly without a network round trip.

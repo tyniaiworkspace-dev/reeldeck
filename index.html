@@ -132,6 +132,15 @@
   .helplist li{margin-bottom:7px}
   .helplist b{color:var(--text)}
   .helplist a,.panel p a{color:var(--accent);text-decoration:underline}
+  .contbar{margin-bottom:12px}
+  .contcard{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px;border-radius:14px;background:linear-gradient(135deg,rgba(255,77,109,.16),rgba(124,92,255,.16));border:1px solid var(--line)}
+  .contthumb{width:52px;height:70px;flex:0 0 auto;border-radius:9px;overflow:hidden;background:var(--card2);display:grid;place-items:center;font-size:18px}
+  .contthumb img{width:100%;height:100%;object-fit:cover}
+  .contmeta{min-width:0;flex:1}
+  .contmeta b{display:block;font-size:13px;line-height:1.3;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .contmeta span{font-size:11.5px;color:var(--muted)}
+  .contgo{flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:13px}
+  .state.newb{background:var(--accent2);color:#fff}
   .boxaddr{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px 10px;margin-bottom:10px;text-align:center}
   .boxaddr code{font:700 15px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);word-break:break-all}
   .boxmeta{font-size:11.5px;color:var(--muted);margin:8px 0 10px;line-height:1.45}
@@ -267,6 +276,7 @@
 <main>
   <!-- FEED -->
   <section id="view-feed" class="on">
+    <div class="contbar" id="contBar" hidden></div>
     <div class="chips" id="feedChips"></div>
     <div class="grid" id="feedGrid"></div>
     <div id="feedStatus" class="status" hidden></div>
@@ -477,7 +487,7 @@
   ];
 
   // ---------- tiny helpers ----------
-  var APP_VERSION = '0.7.1';
+  var APP_VERSION = '0.8.0';
   var $ = function(id){ return document.getElementById(id); };
   function store(key, val){
     try{
@@ -714,10 +724,12 @@
   // ---------- shelf (catalog.json: the whole library, refreshed by a scheduled build) ----------
   function shelfCardHTML(s, i){
     var complete = s.state === 'full' || s.state === 'set';
+    var fresh = s.created && (Date.now() / 1000 - Number(s.created)) < 7 * 86400;
     var sub = (s.channel || '') + (s.views ? ' · ' + views(s.views) + ' views' : '');
     return '<button class="card" data-shelf="' + i + '">' +
       '<div class="thumb">' +
         (s.thumb ? '<img loading="lazy" src="' + esc(s.thumb) + '" alt="">' : '<div class="ph">🎬</div>') +
+        (fresh ? '<span class="state newb">NEW</span>' : '') +
         (s.label ? '<span class="state ' + (complete ? 'ok' : 'checking') + '">' + esc(s.label) + '</span>' : '') +
         '<span class="dur">' + dur(s.duration) + '</span>' +
       '</div>' +
@@ -1258,6 +1270,44 @@
     return item.url;
   }
 
+  // "Continue" is a bookmark, not a playhead: the platform's player owns playback, so the
+  // page can only remember WHICH story and which part was open. That is the useful half for
+  // a 40-part drama; pretending to resume mid-episode would be a lie the embed cannot keep.
+  function rememberResume(){
+    try{
+      if(currentSeries && currentSeries.parts && currentSeries.parts.length){
+        var p0 = currentSeries.parts[0] || {};
+        store('rd.resume', {kind:'series', sid: currentSeries.sid || currentSeries.parts[0].id,
+          parts: currentSeries.parts, i: currentPartIndex || 0, ts: Math.floor(Date.now()/1000)});
+      }else if(current){
+        store('rd.resume', {kind:'item', item: current, ts: Math.floor(Date.now()/1000)});
+      }
+    }catch(e){}
+  }
+
+  function renderContinue(){
+    var el = $('contBar'); if(!el) return;
+    var r = store('rd.resume');
+    var age = r ? Math.floor(Date.now()/1000) - (Number(r.ts) || 0) : 0;
+    if(!r || age > 30 * 86400 || age < 0){ el.hidden = true; return; }
+    var title, thumb, sub;
+    if(r.kind === 'series'){
+      var p = (r.parts || [])[0] || {};
+      title = p.title || 'Story';
+      thumb = p.thumb || '';
+      sub = 'Continue · part ' + ((Number(r.i) || 0) + 1) + ' of ' + (r.parts || []).length;
+    }else{
+      title = (r.item || {}).title || 'Video';
+      thumb = (r.item || {}).thumb || '';
+      sub = 'Continue watching';
+    }
+    el.innerHTML = '<button class="contcard" id="contBtn">' +
+      '<span class="contthumb">' + (thumb ? '<img loading="lazy" src="' + esc(thumb) + '" alt="">' : '🎬') + '</span>' +
+      '<span class="contmeta"><b>' + esc(title) + '</b><span>' + esc(sub) + '</span></span>' +
+      '<span class="contgo">▶</span></button>';
+    el.hidden = false;
+  }
+
   function openItem(item, opts){
     current = item;
     currentSeries = null;
@@ -1272,6 +1322,7 @@
     pushRecent(item);
     renderSaveBtn();
     if(opts && opts.auto) saveItem(item, true);
+    rememberResume();
   }
 
   function openSeries(s){
@@ -1287,6 +1338,7 @@
     currentSeries = s;
     currentPartIndex = i;
     renderPartsBar();
+    rememberResume();
     clearTimeout(partTimer);
     if(playAllMode && it.duration > 0 && i + 1 < list.length){
       partTimer = setTimeout(function(){
@@ -1527,6 +1579,7 @@
     });
     var btns = $('tabbar').querySelectorAll('button');
     for(var i=0;i<btns.length;i++) btns[i].classList.toggle('on', btns[i].getAttribute('data-tab') === name);
+    if(name === 'feed') renderContinue();
     if(name === 'saved'){ renderSaved(); renderFamily(); }
     if(name === 'channels') renderChannels();
     if(name === 'apps'){ renderApps(); renderRecent(); boxRender(); boxRenderMsgs(); boxPoll(); }
@@ -1616,6 +1669,19 @@
     }
     state.page += 1;
     loadFeed(false);
+  });
+
+  $('contBar').addEventListener('click', function(e){
+    if(!e.target.closest('#contBtn')) return;
+    var r = store('rd.resume');
+    if(!r) return;
+    if(r.kind === 'series' && r.parts && r.parts.length){
+      var s = {sid: r.sid || r.parts[0].id, parts: r.parts, state: 'set'};
+      playAllMode = false;
+      openPart(s, Math.min(Number(r.i) || 0, r.parts.length - 1));
+    }else if(r.item){
+      openItem(r.item);
+    }
   });
 
   $('channelList').addEventListener('click', function(e){
@@ -1769,6 +1835,7 @@
     if(ver) ver.textContent = APP_VERSION;
     boxRender();
     boxRenderMsgs();
+    renderContinue();
     // The shelf loads first: the whole library, one request. Live search is the fallback.
     loadCatalog().then(function(ok){
       if(ok) return;
@@ -1832,7 +1899,8 @@
     openItem: openItem,
     box: function(){ return box; },
     boxPoll: boxPoll,
-    boxMake: boxMake
+    boxMake: boxMake,
+    renderContinue: renderContinue
   };
 })();
 </script>

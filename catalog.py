@@ -256,7 +256,9 @@ def main():
     if merged != auto:
         json.dump({"channels": merged[:60]}, open("channels-auto.json", "w"),
                   ensure_ascii=False, indent=1)
-        print(f" channels-auto.json: +{len(merged) - len(keep)} (total {len(merged[:60])})")
+        kept = merged[:60]
+        print(f" channels-auto.json: {len(kept)} kept"
+              f" ({len(merged) - len(keep)} new, {max(0, len(merged) - 60)} over the cap)")
 
 
 if __name__ == "__main__":

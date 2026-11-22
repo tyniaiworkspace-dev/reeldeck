@@ -11,6 +11,32 @@ started; the app had no version number until then.
 
 ---
 
+## [0.8.0] — 2026-11-23
+
+### Added
+- **Continue watching** at the top of the Feed. The last story you opened comes back as one
+  card — title, poster, and "part 4 of 12" for a multi-part drama. Tapping it reopens the
+  series at that part. A bookmark, not a playhead: the platform's player owns playback, so the
+  page records which story and which part, and says so rather than pretending to resume
+  mid-episode. Expires after 30 days.
+- **NEW badge** on shelf cards uploaded in the last seven days, so a rebuilt catalogue reads as
+  a service rather than a static list.
+- **Instant shelf.** The service worker serves `catalog.json` from cache the moment the app
+  opens and refreshes it behind the screen (stale-while-revalidate), so a cold open on a weak
+  signal shows every story instead of a spinner.
+- Eight genre crawls: ceo, billionaire, werewolf, alpha, revenge, chinese short drama,
+  cdrama eng sub, romance short drama.
+
+### Changed
+- Catalogue rebuilt: **9,356 videos → 6,870 stories, 2,617 complete, 600 multi-part sets,
+  9,895 hours** (was 5,989 / 2,315 / 7,656). 60 auto-discovered channels, capped.
+
+### Fixed
+- `catalog.py` printed `+96 (total 60)` when more channels qualified than the cap allowed;
+  it now reports kept, new and over-cap separately.
+
+---
+
 ## [0.7.1] — 2026-11-23
 
 ### Changed
