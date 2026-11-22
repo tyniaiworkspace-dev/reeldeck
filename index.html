@@ -189,6 +189,9 @@
   .tabn{position:absolute;top:6px;right:calc(50% - 22px);min-width:16px;height:16px;border-radius:999px;background:var(--accent);color:#fff;font-size:9.5px;font-weight:800;display:grid;place-items:center;padding:0 4px}
   .tabn:empty{display:none}
 
+  .sechead{font-size:11.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin:2px 0 10px;font-weight:800}
+  .sechead span{text-transform:none;letter-spacing:0;font-weight:500;opacity:.7;margin-left:6px}
+  #familyWrap{margin-bottom:22px}
   .tools{display:flex;gap:8px;margin-bottom:12px}
   .tools button{flex:1;padding:11px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted)}
   .importbar{display:flex;gap:8px;align-items:center;background:#221a2b;border:1px solid #43315a;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:12.5px}
@@ -238,6 +241,11 @@
 
   <!-- SAVED -->
   <section id="view-saved">
+    <div id="familyWrap" hidden>
+      <h2 class="sechead">Family picks <span>same on every phone</span></h2>
+      <div class="grid" id="familyGrid"></div>
+    </div>
+    <h2 class="sechead">Your list <span>only on this phone</span></h2>
     <div class="tools">
       <button id="recheckAll">Re-check all</button>
       <button id="shareList">Share my list</button>
@@ -771,6 +779,65 @@
     }).join('');
   }
 
+  // ---------- family picks (shared via family.json in the repo) ----------
+  var family = [];
+  function loadFamily(){
+    return fetch('family.json', {cache:'no-store'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(!d || !d.items) return;
+        family = d.items.map(function(x){
+          var p = ({dm:'dailymotion', yt:'youtube', tt:'tiktok', fb:'facebook'})[x.p];
+          return p ? {platform:p, id:x.i, title:x.t || '', thumb:'', duration:0, status:'checking'} : null;
+        }).filter(Boolean);
+        family.forEach(function(_, i){ resolvePick(i); });
+        renderFamily();
+      })
+      .catch(function(){});
+  }
+
+  function resolvePick(i){
+    var it = family[i];
+    if(!it) return;
+    var done = function(status, f){
+      it.status = status;
+      if(f) Object.keys(f).forEach(function(k){ if(f[k]) it[k] = f[k]; });
+      if(state.tab === 'saved') renderFamily();
+    };
+    if(it.platform === 'dailymotion'){
+      getJSON(dmUrl('/video/' + it.id, {fields: DM_FIELDS}))
+        .then(function(v){ done('ok', {title:v.title, thumb:v.thumbnail_360_url, duration:v.duration}); })
+        .catch(function(){ done('dead'); });
+    }else if(it.platform === 'youtube'){
+      fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(canonicalUrl('youtube', it.id)))
+        .then(function(r){ if(!r.ok) throw new Error('x'); return r.json(); })
+        .then(function(d){ done('ok', {title:d.title, thumb:d.thumbnail_url}); })
+        .catch(function(){ done('dead'); });
+    }else{
+      done('app');
+    }
+  }
+
+  function renderFamily(){
+    var wrap = $('familyWrap'), grid = $('familyGrid');
+    if(!family.length){ wrap.hidden = true; return; }
+    wrap.hidden = false;
+    grid.innerHTML = family.map(function(s, i){
+      var st = s.status === 'ok' ? '<span class="state ok">works</span>'
+        : s.status === 'dead' ? '<span class="state dead">gone</span>'
+        : s.status === 'checking' ? '<span class="state checking">…</span>'
+        : '<span class="state app">in app</span>';
+      return '<button class="card" data-family="' + i + '">' +
+        '<div class="thumb">' +
+          (s.thumb ? '<img loading="lazy" src="' + esc(s.thumb) + '" alt="">' : '<div class="ph">🎬</div>') +
+          '<span class="badge">' + esc(shortPlatform(s.platform)) + '</span>' + st +
+          '<span class="dur">' + dur(s.duration || 0) + '</span>' +
+        '</div>' +
+        '<div class="meta"><span class="title">' + esc(s.title || 'Family pick') + '</span>' +
+        '<span class="sub">family pick</span></div></button>';
+    }).join('');
+  }
+
   function renderSaveBtn(){
     var b = $('playerSave');
     if(!b) return;
@@ -896,7 +963,7 @@
     });
     var btns = $('tabbar').querySelectorAll('button');
     for(var i=0;i<btns.length;i++) btns[i].classList.toggle('on', btns[i].getAttribute('data-tab') === name);
-    if(name === 'saved') renderSaved();
+    if(name === 'saved'){ renderSaved(); renderFamily(); }
     if(name === 'channels') renderChannels();
     if(name === 'apps'){ renderApps(); renderRecent(); }
   }
@@ -1005,6 +1072,13 @@
     renderSaveBtn();
   });
 
+  $('familyGrid').addEventListener('click', function(e){
+    var c = e.target.closest('[data-family]');
+    if(!c) return;
+    var it = family[Number(c.getAttribute('data-family'))];
+    if(it) openItem(it);
+  });
+
   $('recheckAll').addEventListener('click', checkAll);
 
   $('shareList').addEventListener('click', function(){
@@ -1075,6 +1149,7 @@
     .catch(function(){})
     .then(boot);
 
+  loadFamily();
   window.addEventListener('hashchange', parseHash);
 
   if('serviceWorker' in navigator && location.protocol === 'https:'){

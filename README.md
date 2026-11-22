@@ -1,85 +1,83 @@
 # ReelDeck — one place for the AI-story reels
 
-A tiny installable web app (PWA) that puts the family's AI-story / short-drama reels in
-one screen, plays them with the **platform's own player**, and opens the native app for
-anything that refuses to embed. No downloads, no re-hosting, no accounts.
+A small installable web app for five phones. It puts AI-story / AI short-drama reels in one
+screen, plays them with the **platform's own player**, keeps a per-phone saved list with a
+working-link check, and accepts links straight from the Android share sheet.
 
-## Open it on a phone
+**Hosted free:** https://tyniaiworkspace-dev.github.io/reeldeck/
+**Home Wi-Fi copy:** http://192.168.8.221:8788 (runs on the PC, `systemctl --user status reeldeck`)
 
-Same Wi-Fi as this PC:
+No accounts, no logins, no Tailscale, no downloads, no re-hosting.
 
-```
-http://192.168.8.221:8788
-```
+## Put it on a phone
 
-Then in Chrome: **⋮ → Add to Home screen → Install**. It gets its own icon and opens
-fullscreen. (That menu item works on plain HTTP; the offline cache only switches on
-under HTTPS.)
+1. Open the hosted URL in Chrome.
+2. **⋮ → Add to Home screen → Install.** It gets its own icon and opens fullscreen.
+3. Scan the QR in a sister's phone if that is easier: `qr-lan.png` (LAN copy).
 
-Away from home, the PC's Tailscale address works if the phone is on the tailnet:
+Each phone keeps its own state — follows, saved list, history. There is nothing to sign into.
 
-```
-http://100.72.81.62:8788
-```
+## The four tabs
 
-## What each tab does
-
-| Tab | What you get |
+| Tab | What it does |
 |---|---|
-| **Feed** | Newest videos from Dailymotion. "Following" merges the channels you follow; "All AI stories" searches the topic; "10 min+" filters to the long compilations. |
-| **Channels** | Follow/unfollow the curated AI-story channels, or paste any Dailymotion channel link to add one. |
-| **Links** | Paste a Facebook reel, TikTok video, Dailymotion or YouTube link and it plays here or opens in the app that owns it. Plus one-tap tiles for the apps they already use, and a local "recently opened" list. |
+| **Feed** | Newest videos from Dailymotion. Chips switch genre (AI stories / short drama / AI tales) and filter to 10 min+. Every card plays inline. |
+| **Saved** | **Family picks** — one shared list read from `family.json`, identical on all five phones. **Your list** — only on that phone. Every item shows `works`, `gone`, or `in app`, plus when it was last checked. |
+| **Channels** | Follow/unfollow the seeded AI-story channels, or paste any Dailymotion channel link. |
+| **Links** | Paste a Facebook / TikTok / Dailymotion / YouTube link, or tap the app tiles. |
 
-## Why this shape
+## Sharing between the five phones
 
-- **Dailymotion is the only one with a free, keyless, CORS-enabled API**, so it is the
-  live feed. That is also where a lot of the AI-story channels mirror their uploads.
-- **TikTok and YouTube embed without a login** — paste a link, it plays inline.
-- **Facebook Reels mostly demand a login** to embed, so Facebook links get the
-  "Open in app" button instead of a broken black box.
-- Everything is a link or an official embed. Nothing is copied, so nothing here is a
-  re-host and there is nothing to keep in sync or take down.
+Three routes, all free:
 
-## Add or change channels
+- **Share sheet → ReelDeck.** In Facebook or TikTok, tap Share → ReelDeck. The link lands in
+  the app, opens, and is saved to that phone's list automatically.
+- **ReelDeck links.** Every video has a short link like
+  `…/reeldeck/#dm/xbyvybi` (`dm` Dailymotion, `fb` Facebook, `tt` TikTok, `yt` YouTube).
+  Send it in WhatsApp; it opens straight into the player on any phone.
+- **Share my list.** On the Saved tab, "Share my list" builds a single import link. A sister
+  opens it, taps **Add**, and gets the whole list (each item is re-checked on arrival).
 
-Channels live in two places:
+## Link checking
 
-1. `DEFAULT_CHANNELS` in `index.html` — the six seeded Dailymotion channels
-   (`Tales by Jenny`, `KIDS CORNER`, `Ai Video`, `Cartoon Boy`, `ASMR world`, `Meow Media`).
-2. Anything added from the **Channels** tab → saved in this phone's `localStorage`
-   (`rd.extraChannels`, `rd.follows`).
+- **Dailymotion and YouTube** are verified in the browser: title, thumbnail and duration are
+  refetched, and a 404 marks the item `gone`.
+- **TikTok and Facebook** cannot be verified without a login, so they are labelled `in app`
+  instead of pretending they passed.
+- "Re-check all" reruns the check on demand, and each card shows how long ago it passed.
 
-To change the seed list, edit that array and reload. To start a phone fresh, clear the
-site's storage in Chrome settings.
+## Shared storage (the Google Drive question)
 
-## Run / stop
-
-It runs as a user service:
-
-```bash
-systemctl --user status reeldeck     # is it up?
-systemctl --user restart reeldeck    # after editing files
-systemctl --user disable --now reeldeck
-```
-
-Manual run (foreground): `./serve.sh`
+The family picks and the channel list live as two small JSON files in this repo:
+`family.json` and `channels.json`. Editing either one changes the app for all five phones on
+the next open. That does the job Google Drive would, without OAuth, quota or a login for
+anyone. Each sister's personal list stays on her own phone.
 
 ## Files
 
 ```
-index.html            the whole app (UI + logic)
-manifest.webmanifest  install metadata
-sw.js                 offline shell cache (HTTPS only)
+index.html            the whole app
+manifest.webmanifest  install metadata + Android share target
+sw.js                 offline shell + POST /share → ?share= redirect
+channels.json         shared channel list and genre chips
+family.json           shared "Family picks"
 icons/                app icons
-serve.sh              python3 -m http.server 8788
+qr-lan.png            QR for the LAN copy
+serve.sh              python3 -m http.server 8788 (local copy)
 ```
 
-## Limits worth knowing
+## Local copy
 
-- Dailymotion's public API returns roughly the newest 1,000 matches for a search term;
-  very deep paging stops there.
-- The "10 min+" chip filters the batch already loaded; switch to **All AI stories** to
-  pull long compilations.
-- Facebook feed enumeration is not available without a logged-in session, so Facebook is
-  link-and-open only.
-- Thumbnails come from Dailymotion's CDN and can 404 when an upload is removed.
+```bash
+systemctl --user status reeldeck     # is it up?
+systemctl --user restart reeldeck    # after editing files
+./serve.sh                           # foreground alternative
+```
+
+## Limits
+
+- Facebook Reels need a login to embed, so those open in the Facebook app.
+- Dailymotion's public API returns about the newest 1,000 matches per search term.
+- The "10 min+" chip filters the batch already loaded; reopen the genre chip for a fresh pull.
+- No account means no server-side backup: clearing Chrome's site data clears that phone's list.
+  Use "Share my list" first if you want a copy.

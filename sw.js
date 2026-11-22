@@ -3,7 +3,7 @@
    - caches the shell so the app opens instantly / offline
    Registered only on https (GitHub Pages), so the plain-LAN copy is unaffected. */
 const CACHE = 'reeldeck-v2';
-const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'channels.json',
+const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'channels.json', 'family.json',
                'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
