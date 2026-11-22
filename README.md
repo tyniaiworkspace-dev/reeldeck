@@ -21,7 +21,7 @@ Each phone keeps its own state — follows, saved list, history. There is nothin
 
 | Tab | What it does |
 |---|---|
-| **Feed** | Newest videos from Dailymotion. Chips switch genre (AI stories / short drama / AI tales) and filter to 10 min+. Every card plays inline. |
+| **Feed** | Newest videos from Dailymotion. Chips switch genre (AI stories / short drama / AI tales), show only complete stories, and filter to 10 min+. Every card plays inline. |
 | **Saved** | **Family picks** — one shared list read from `family.json`, identical on all five phones. **Your list** — only on that phone. Every item shows `works`, `gone`, or `in app`, plus when it was last checked. |
 | **Channels** | Follow/unfollow the seeded AI-story channels, or paste any Dailymotion channel link. |
 | **Links** | Paste a Facebook / TikTok / Dailymotion / YouTube link, or tap the app tiles. |
@@ -37,6 +37,26 @@ Three routes, all free:
   Send it in WhatsApp; it opens straight into the player on any phone.
 - **Share my list.** On the Saved tab, "Share my list" builds a single import link. A sister
   opens it, taps **Add**, and gets the whole list (each item is re-checked on arrival).
+
+## Full stories, not fragments
+
+Dailymotion titles carry the only reliable signal, so the app reads them:
+
+- `Part 1/3`, `Part 1/2`, `Episode 2`, `Episodes 1-40` are parsed, and the part marker is
+  stripped to form the story's base title.
+- Uploads with the same base title are grouped. Long shared titles can group across channels,
+  because the same drama is reposted widely; short generic titles stay per channel.
+- Each group gets a label: **FULL** (the title says full / complete / all episodes, or it is
+  `Part 1/1`), **ALL 3 PARTS** (complete numbered set), **3 PARTS** (set, total unknown), or
+  **PART 1/3** (incomplete).
+- **Full stories** (on by default) hides every incomplete group, so the feed only offers
+  stories you can watch start to finish. Switch it off to see the fragments.
+- A multi-part set opens with a parts bar and **Play all**, which advances to the next part
+  when the current one ends.
+
+**When a copy is blocked or only a part exists**, the player's **Find the full version** button
+searches the cleaned title and lists other uploads, full ones first, longest first. In testing,
+one title returned 49 versions with 6 marked FULL, including 2–3 hour complete cuts.
 
 ## Link checking
 
@@ -76,6 +96,11 @@ systemctl --user restart reeldeck    # after editing files
 
 ## Limits
 
+- Completeness is inferred from titles and part numbers. A fragment whose title carries no
+  marker and has no sibling looks complete; **Find the full version** is the escape hatch.
+- Dailymotion refuses direct stream URLs through its public API (`stream_h264_url` returns
+  403), so there is no custom-player route around a blocked embed. Mirrored uploads are the
+  workaround.
 - Facebook Reels need a login to embed, so those open in the Facebook app.
 - Dailymotion's public API returns about the newest 1,000 matches per search term.
 - The "10 min+" chip filters the batch already loaded; reopen the genre chip for a fresh pull.

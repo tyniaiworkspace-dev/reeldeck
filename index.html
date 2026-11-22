@@ -16,6 +16,7 @@
     --radius:16px; --tabh:64px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  [hidden]{display:none !important}
   html,body{margin:0;padding:0}
   body{
     background:var(--bg); color:var(--text);
@@ -164,10 +165,25 @@
   .sheet .bar{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:2}
   .sheet .bar h3{font-size:14px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .x{width:34px;height:34px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font-size:17px;flex:0 0 auto}
+  .partsbar{display:flex;gap:6px;overflow-x:auto;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg);scrollbar-width:none}
+  .partsbar::-webkit-scrollbar{display:none}
+  .partsbar button{flex:0 0 auto;padding:8px 13px;border-radius:999px;background:var(--card2);border:1px solid var(--line);font-size:12.5px;font-weight:700;color:var(--muted)}
+  .partsbar button.on{background:var(--text);color:#0b0b0f;border-color:var(--text)}
+  .partsbar button.playall{background:var(--accent);border-color:var(--accent);color:#fff}
+
   .frame{position:relative;background:#000;aspect-ratio:9/16;max-height:70vh;margin:0 auto}
   .frame.wide{aspect-ratio:16/9;max-height:56vh}
   .frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
   .fallback{padding:34px 18px;text-align:center;color:var(--muted);font-size:14px;line-height:1.5}
+  .playhint{padding:10px 14px;color:var(--muted);font-size:12px;line-height:1.5;border-bottom:1px solid var(--line)}
+  .linkbtn{color:var(--accent);font-weight:700;text-decoration:underline;font-size:inherit;padding:0}
+  .altlist{padding:10px 12px 18px;display:flex;flex-direction:column;gap:8px}
+  .altlist button{display:flex;gap:10px;align-items:center;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px}
+  .altlist img{width:74px;height:46px;object-fit:cover;border-radius:8px;background:#000;flex:0 0 auto}
+  .altlist .ph2{width:74px;height:46px;border-radius:8px;background:var(--card2);display:grid;place-items:center;flex:0 0 auto}
+  .altlist .t{min-width:0}
+  .altlist .t b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .altlist .t span{font-size:11.5px;color:var(--muted)}
   .sheet .actions{display:flex;gap:8px;padding:12px 14px 16px}
   .sheet .actions a,.sheet .actions button{
     flex:1;text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;
@@ -328,12 +344,23 @@
       <button class="x" id="playerSave" aria-label="Save to my list">☆</button>
       <button class="x" id="playerClose" aria-label="Close">✕</button>
     </div>
+    <div id="partsBar" class="partsbar" hidden></div>
     <div id="playerBody"></div>
     <div class="actions">
       <a id="playerOpen" class="primary" target="_blank" rel="noopener">Open in app</a>
       <button id="playerShare">Share</button>
       <button id="playerCopy">Copy link</button>
     </div>
+  </div>
+</div>
+
+<div class="sheet" id="altSheet" hidden>
+  <div class="inner">
+    <div class="bar">
+      <h3 id="altTitle">Other copies</h3>
+      <button class="x" id="altClose" aria-label="Close">✕</button>
+    </div>
+    <div id="altList" class="altlist"></div>
   </div>
 </div>
 
@@ -349,7 +376,7 @@
   'use strict';
 
   var DM_API = 'https://api.dailymotion.com';
-  var DM_FIELDS = 'id,title,duration,thumbnail_360_url,url,created_time,views_total,owner,owner.screenname';
+  var DM_FIELDS = 'id,title,duration,thumbnail_360_url,url,created_time,views_total,owner,owner.screenname,allow_embed,geoblocking';
 
   // Seeded from channels.json when it is reachable; this list is the offline fallback.
   var DEFAULT_CHANNELS = [
@@ -429,7 +456,9 @@
     page: 1,
     loading: false,
     items: [],
-    longOnly: store('rd.long') === true
+    series: [],
+    longOnly: store('rd.long') === true,
+    fullOnly: store('rd.full') !== false
   };
 
   function channelById(id){
@@ -460,7 +489,9 @@
       created: v.created_time || 0,
       views: v.views_total || 0,
       channel: v['owner.screenname'] || '',
-      channelId: v.owner || ''
+      channelId: v.owner || '',
+      embed: v.allow_embed !== false,
+      geo: v.geoblocking || null
     };
   }
   function getJSON(url){
@@ -469,10 +500,12 @@
       return r.json();
     });
   }
-  function searchDM(q, page){
-    return getJSON(dmUrl('/videos', {
-      search: q, sort: 'recent', limit: 24, page: page, fields: DM_FIELDS
-    })).then(function(d){ return (d.list || []).map(normalizeDM); });
+  // sort 'relevance' omits the sort param (Dailymotion's default), which is what
+  // finding another copy of a known title wants; the feed wants 'recent'.
+  function searchDM(q, page, sort, limit){
+    var params = {search: q, limit: limit || 24, page: page, fields: DM_FIELDS};
+    if(sort !== 'relevance') params.sort = sort || 'recent';
+    return getJSON(dmUrl('/videos', params)).then(function(d){ return (d.list || []).map(normalizeDM); });
   }
   function channelDM(id, page){
     return getJSON(dmUrl('/user/' + id + '/videos', {
@@ -480,19 +513,99 @@
     })).then(function(d){ return (d.list || []).map(normalizeDM); });
   }
 
+  // ---------- series / completeness engine ----------
+  // Titles carry the only reliable signal we have: "Part 1/3", "Episode 2",
+  // "Episodes 1-40", "Full Movie", "All Episodes". We group by the title with the
+  // marker removed and decide whether the set is whole.
+  var TAG_RE = /\b(full (?:movie|drama|series|episodes?|story)|complete|all episodes?|eng(?:lish)? sub(?:title)?s?|short drama|full short drama|joyreels|netshort|hd|720p|1080p)\b/gi;
+
+  function analyzeTitle(raw){
+    var t = String(raw || '');
+    var a = {base:'', part:0, total:0, range:null, full:false};
+    var m;
+    if((m = t.match(/\bepisodes?\s*(\d+)\s*[-–]\s*(\d+)\b/i))){
+      a.range = [Number(m[1]), Number(m[2])];
+    }else if((m = t.match(/\b(?:part|pt)\.?\s*(\d+)\s*(?:\/\s*(\d+))?\b/i))){
+      a.part = Number(m[1]); a.total = m[2] ? Number(m[2]) : 0;
+    }else if((m = t.match(/\b(?:episode|ep)\.?\s*(\d+)\s*(?:\/\s*(\d+))?\b/i))){
+      a.part = Number(m[1]); a.total = m[2] ? Number(m[2]) : 0;
+    }
+    a.full = /\b(full (?:movie|drama|series|episodes?|story)|complete|all episodes?)\b/i.test(t)
+          || (a.part === 1 && a.total === 1) || !!a.range;
+    a.base = t
+      .replace(/\bepisodes?\s*\d+\s*[-–]\s*\d+/ig, ' ')
+      .replace(/\b(?:part|pt|episode|ep)\.?\s*\d+\s*(?:\/\s*\d+)?/ig, ' ')
+      .replace(TAG_RE, ' ')
+      .replace(/[\u{1F000}-\u{1FAFF}\u{2190}-\u{27BF}]/gu, ' ')
+      .replace(/[\[\](){}|:;,.!?"'“”‘’#*_~\-–—]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim().toLowerCase()
+      .replace(/\s+(drama|movie|series)\s*$/, '');
+    return a;
+  }
+
+  function buildSeries(items){
+    var groups = {}, order = [];
+    items.forEach(function(v){
+      v._a = analyzeTitle(v.title);
+      var b = v._a.base;
+      // Long shared titles can group across channels (same story reposted); short
+      // ones ("ai stories") stay per channel so unrelated clips do not merge.
+      var key = b.length >= 18 ? b : 'ch:' + (v.channelId || '') + '|' + b;
+      if(!groups[key]){ groups[key] = {key:key, base:b, items:[]}; order.push(key); }
+      groups[key].items.push(v);
+    });
+    return order.map(function(k, i){ return finishSeries(groups[k], i); });
+  }
+
+  function finishSeries(g, sid){
+    var parts = g.items.filter(function(v){ return v._a.part > 0 && !v._a.full; })
+                       .sort(function(a,b){ return a._a.part - b._a.part; });
+    var full = g.items.filter(function(v){ return v._a.full; })[0] || null;
+    var total = 0;
+    g.items.forEach(function(v){ if(v._a.total > total) total = v._a.total; });
+    var have = {}, missing = [];
+    parts.forEach(function(v){ have[v._a.part] = true; });
+    for(var i = 1; i <= total; i++) if(!have[i]) missing.push(i);
+
+    var s = {sid:sid, key:g.key, base:g.base, items:g.items, parts:parts, full:full,
+             total:total, missing:missing, cover: full || parts[0] || g.items[0],
+             state:'single', label:''};
+    if(full){ s.state = 'full'; s.label = 'FULL'; }
+    else if(parts.length >= 2 && total && missing.length === 0){ s.state = 'set'; s.label = 'ALL ' + total + ' PARTS'; }
+    else if(parts.length >= 2){ s.state = 'set'; s.label = parts.length + ' PARTS'; }
+    else if(parts.length === 1 && total > 1){ s.state = 'partial'; s.label = 'PART ' + parts[0]._a.part + '/' + total; }
+    else if(parts.length === 1){ s.state = 'partial'; s.label = 'PART ' + parts[0]._a.part; }
+    return s;
+  }
+
+  function seriesComplete(s){ return s.state === 'full' || s.state === 'set' || s.state === 'single'; }
+
+  function seriesDuration(s){
+    if(s.full) return s.full.duration || 0;
+    if(s.parts.length) return s.parts.reduce(function(n, v){ return n + (v.duration || 0); }, 0);
+    return s.cover.duration || 0;
+  }
+
   // ---------- rendering ----------
-  function cardHTML(v){
-    return '<button class="card" data-platform="' + v.platform + '" data-id="' + esc(v.id) + '">' +
+  function seriesCardHTML(s){
+    var v = s.cover;
+    var complete = seriesComplete(s);
+    var sub = s.state === 'set'
+      ? s.parts.length + ' parts, played in order'
+      : (v.channel || '') + (v.views ? ' · ' + views(v.views) + ' views' : '');
+    return '<button class="card" data-series="' + s.sid + '">' +
       '<div class="thumb">' +
         (v.thumb
           ? '<img loading="lazy" src="' + esc(v.thumb) + '" alt="">'
           : '<div class="ph">🎬</div>') +
-        '<span class="badge">' + esc(v.platform === 'dailymotion' ? 'DM' : v.platform) + '</span>' +
-        '<span class="dur">' + dur(v.duration) + '</span>' +
+        '<span class="badge">DM</span>' +
+        (s.label ? '<span class="state ' + (complete ? 'ok' : 'checking') + '">' + esc(s.label) + '</span>' : '') +
+        '<span class="dur">' + dur(seriesDuration(s)) + '</span>' +
       '</div>' +
       '<div class="meta">' +
         '<span class="title">' + esc(v.title) + '</span>' +
-        '<span class="sub">' + esc(v.channel || '') + (v.views ? ' · ' + views(v.views) + ' views' : '') + (v.created ? ' · ' + ago(v.created) : '') + '</span>' +
+        '<span class="sub">' + esc(sub) + '</span>' +
       '</div>' +
     '</button>';
   }
@@ -505,12 +618,18 @@
 
   function renderFeed(append){
     var grid = $('feedGrid'), status = $('feedStatus'), more = $('loadMore');
-    var items = state.items.filter(function(v){ return !state.longOnly || v.duration >= 600; });
-    grid.innerHTML = (append ? grid.innerHTML : '') + items.map(cardHTML).join('');
+    var list = state.series.filter(function(s){
+      if(state.fullOnly && !seriesComplete(s)) return false;
+      if(state.longOnly && seriesDuration(s) < 600) return false;
+      return true;
+    });
+    grid.innerHTML = (append ? grid.innerHTML : '') + list.map(seriesCardHTML).join('');
     status.hidden = true;
-    more.hidden = items.length < 6;
-    if(!items.length && state.items.length){
-      setStatus('No 10-minute videos in this batch. Switch to All AI stories for the long ones.');
+    more.hidden = list.length < 6;
+    if(!list.length && state.series.length){
+      setStatus(state.fullOnly
+        ? 'This batch only had fragments. Switch off “Full stories” to see the parts, or try another genre.'
+        : 'No 10-minute videos in this batch. Try another genre.');
     }
   }
 
@@ -535,6 +654,7 @@
       var on = state.mode === 'all' && state.query === q;
       return '<button class="chip' + (on ? ' on' : '') + '" data-query="' + esc(q) + '">' + esc(qLabel(q)) + '</button>';
     }).join('');
+    html += '<button class="chip' + (state.fullOnly ? ' on' : '') + '" data-chip="full">Full stories</button>';
     html += '<button class="chip' + (state.longOnly ? ' on' : '') + '" data-chip="long">10 min+</button>';
     $('feedChips').innerHTML = html;
   }
@@ -571,6 +691,7 @@
 
     work.then(function(items){
       state.items = reset ? items : state.items.concat(items);
+      state.series = buildSeries(state.items);
       state.loading = false;
       if(!state.items.length){
         $('feedGrid').innerHTML = '';
@@ -922,7 +1043,13 @@
   var current = null;
   function embedHTML(item){
     if(item.platform === 'dailymotion'){
-      return '<div class="frame"><iframe src="https://www.dailymotion.com/embed/video/' + encodeURIComponent(item.id) + '?autoplay=1&queue-enable=false" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>';
+      if(item.embed === false){
+        return '<div class="fallback">The uploader turned off embedding for this one.<br>Open it in the Dailymotion app, or play another copy.<br><br>' +
+          '<button class="linkbtn" id="findCopyBtn">Find another copy</button></div>';
+      }
+      var partLabel = analyzeTitle(item.title).part ? 'Find the full version' : 'Find another copy';
+      return '<div class="frame"><iframe src="https://www.dailymotion.com/embed/video/' + encodeURIComponent(item.id) + '?autoplay=1&queue-enable=false" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>' +
+        '<div class="playhint">Says “forbidden”? <button class="linkbtn" id="findCopyBtn">' + partLabel + '</button> — the same story is usually uploaded on several channels.</div>';
     }
     if(item.platform === 'tiktok'){
       return '<div class="frame"><iframe src="https://www.tiktok.com/player/v1/' + encodeURIComponent(item.id) + '?autoplay=1" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>';
@@ -937,8 +1064,15 @@
     return '<div class="fallback">No inline player for this link. Use <b>Open in app</b>.</div>';
   }
 
+  var currentSeries = null, currentPartIndex = 0, partTimer = null, playAllMode = false;
+
+  function seriesList(s){ return s.full ? [s.full] : s.parts; }
+
   function openItem(item, opts){
     current = item;
+    currentSeries = null;
+    clearTimeout(partTimer);
+    $('partsBar').hidden = true;
     $('playerTitle').textContent = item.title || 'Video';
     $('playerBody').innerHTML = embedHTML(item);
     $('playerOpen').href = item.url;
@@ -948,11 +1082,98 @@
     renderSaveBtn();
     if(opts && opts.auto) saveItem(item, true);
   }
+
+  function openSeries(s){
+    playAllMode = false;
+    openPart(s, 0);
+  }
+
+  function openPart(s, i){
+    var list = seriesList(s);
+    var it = list[i];
+    if(!it) return;
+    openItem(it);
+    currentSeries = s;
+    currentPartIndex = i;
+    renderPartsBar();
+    clearTimeout(partTimer);
+    if(playAllMode && it.duration > 0 && i + 1 < list.length){
+      partTimer = setTimeout(function(){
+        if(currentSeries === s && currentPartIndex === i) openPart(s, i + 1);
+      }, Math.max(30, it.duration - 3) * 1000);
+    }
+  }
+
+  function renderPartsBar(){
+    var bar = $('partsBar');
+    if(!currentSeries){ bar.hidden = true; return; }
+    var list = seriesList(currentSeries);
+    if(list.length < 2){ bar.hidden = true; return; }
+    var html = '<button class="playall" data-part="play">▶ Play all ' + list.length + '</button>';
+    list.forEach(function(v, i){
+      html += '<button class="' + (i === currentPartIndex ? 'on' : '') + '" data-part="' + i + '">' + (i + 1) + '</button>';
+    });
+    bar.innerHTML = html;
+    bar.hidden = false;
+  }
+
+  var altItems = [];
+
+  function partOf(item){ return analyzeTitle((item && item.title) || '').part; }
+
+  function similarBase(query, base){
+    var words = String(query).split(/\s+/).filter(function(w){ return w.length > 3; });
+    if(!words.length) return true;
+    var hits = words.filter(function(w){ return String(base).indexOf(w) >= 0; }).length;
+    return hits / words.length >= 0.6;
+  }
+
+  function altQuery(item){
+    var a = analyzeTitle(item.title || '');
+    var q = a.base || item.title || '';
+    return q.split(/\s+/).slice(0, 12).join(' ');
+  }
+
+  // The same AI drama is reposted on dozens of channels, so a blocked copy is
+  // usually only one upload away. Search the cleaned title and list the others.
+  function findCopies(item){
+    if(!item) return;
+    var q = altQuery(item);
+    if(!q){ toast('No title to search'); return; }
+    toast('Looking for other copies…');
+    searchDM(q, 1, 'relevance', 50).then(function(list){
+      altItems = list
+        .filter(function(v){ return v.id !== item.id && similarBase(q, analyzeTitle(v.title).base); })
+        .sort(function(a, b){
+          var fa = analyzeTitle(a.title).full ? 1 : 0, fb = analyzeTitle(b.title).full ? 1 : 0;
+          if(fa !== fb) return fb - fa;
+          return (b.duration || 0) - (a.duration || 0);
+        });
+      var fullOnes = altItems.filter(function(v){ return analyzeTitle(v.title).full; }).length;
+      $('altTitle').textContent = altItems.length
+        ? (fullOnes ? fullOnes + ' full · ' + altItems.length + ' ' + (partOf(item) ? 'versions' : 'copies') : altItems.length + (partOf(item) ? ' versions' : ' copies'))
+        : 'No other copies found';
+      $('altList').innerHTML = altItems.length ? altItems.map(function(v){
+        var isFull = analyzeTitle(v.title).full;
+        return '<button data-alt="' + esc(v.id) + '">' +
+          (v.thumb ? '<img src="' + esc(v.thumb) + '" alt="">' : '<div class="ph2">🎬</div>') +
+          '<div class="t"><b>' + esc(v.title) + '</b><span>' +
+            (isFull ? '<span class="state ok" style="position:static;display:inline-block;margin-right:6px">FULL</span>' : '') +
+            esc(v.channel || '') + ' · ' + dur(v.duration) + ' · ' + views(v.views) + ' views</span></div>' +
+        '</button>';
+      }).join('') : '<div class="status">Nothing else for “' + esc(q) + '”.</div>';
+      $('altSheet').hidden = false;
+    }).catch(function(){ toast('Search failed'); });
+  }
+
   function closePlayer(){
     $('player').hidden = true;
     $('playerBody').innerHTML = '';
+    $('partsBar').hidden = true;
     document.body.style.overflow = '';
     current = null;
+    currentSeries = null;
+    clearTimeout(partTimer);
   }
 
   // ---------- tabs ----------
@@ -1000,17 +1221,25 @@
       renderFeed(false);
       return;
     }
+    if(k === 'full'){
+      state.fullOnly = !state.fullOnly;
+      store('rd.full', state.fullOnly);
+      renderChips();
+      renderFeed(false);
+      return;
+    }
     state.mode = k;
     renderChips();
     loadFeed(true);
   });
 
   $('feedGrid').addEventListener('click', function(e){
-    var c = e.target.closest('.card');
+    var c = e.target.closest('[data-series]');
     if(!c) return;
-    var id = c.getAttribute('data-id');
-    var item = state.items.filter(function(x){ return x.id === id; })[0];
-    if(item) openItem(item);
+    var sid = Number(c.getAttribute('data-series'));
+    var s = state.series.filter(function(x){ return x.sid === sid; })[0];
+    if(!s) return;
+    if(s.state === 'set') openSeries(s); else openItem(s.cover);
   });
 
   $('loadMore').addEventListener('click', function(){
@@ -1029,6 +1258,27 @@
 
   $('pasteBtn').addEventListener('click', function(){ openLink($('pasteInput').value); });
   $('pasteInput').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); openLink($('pasteInput').value); } });
+
+  $('playerBody').addEventListener('click', function(e){
+    if(e.target.closest('#findCopyBtn')) findCopies(current);
+  });
+
+  $('altClose').addEventListener('click', function(){ $('altSheet').hidden = true; });
+  $('altSheet').addEventListener('click', function(e){ if(e.target === $('altSheet')) $('altSheet').hidden = true; });
+  $('altList').addEventListener('click', function(e){
+    var b = e.target.closest('[data-alt]');
+    if(!b) return;
+    var v = altItems.filter(function(x){ return x.id === b.getAttribute('data-alt'); })[0];
+    if(v){ $('altSheet').hidden = true; openItem(v); }
+  });
+
+  $('partsBar').addEventListener('click', function(e){
+    var b = e.target.closest('[data-part]');
+    if(!b || !currentSeries) return;
+    var v = b.getAttribute('data-part');
+    if(v === 'play'){ playAllMode = true; openPart(currentSeries, 0); }
+    else { playAllMode = false; openPart(currentSeries, Number(v)); }
+  });
 
   $('playerClose').addEventListener('click', closePlayer);
   $('player').addEventListener('click', function(e){ if(e.target === $('player')) closePlayer(); });
@@ -1155,6 +1405,15 @@
   if('serviceWorker' in navigator && location.protocol === 'https:'){
     navigator.serviceWorker.register('sw.js').catch(function(){});
   }
+
+  window.__rd = {
+    get state(){ return state; },
+    analyzeTitle: analyzeTitle,
+    buildSeries: buildSeries,
+    findCopies: findCopies,
+    openSeries: openSeries,
+    openItem: openItem
+  };
 })();
 </script>
 </body>
