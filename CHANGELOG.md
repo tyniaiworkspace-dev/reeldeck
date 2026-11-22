@@ -11,6 +11,28 @@ started; the app had no version number until then.
 
 ---
 
+## [0.7.1] — 2026-11-23
+
+### Changed
+- Catalogue rebuilt: **5,989 stories, 2,315 complete, 7,656 hours** (was 4,011 / 1,683 /
+  5,036). Six channels whose long uploads stopped appearing (Cedar Canvas Media, Canvas View
+  Narratives, Britain Drama Time, ShineOn, ThinkMedia, Movie Time) were dropped from the
+  crawl; 30 auto-discovered channels remain.
+- `catalog.py` now prints a **low story-share note** for channels it keeps. Evidence for the
+  next review, not an action.
+
+### Fixed
+- Tried to tighten auto-promotion so off-theme channels could not reach the shelf. Both
+  candidate gates were tested against live channel titles and both were **worse than no
+  gate**: a title-keyword ratio pruned `OptimisticWorld`, whose 10 uploads are all Netshort
+  dramas ("Married To Mr. No Mercy"), and a 45-minute mean-episode floor pruned
+  `WillowFrameMeadow` (70% story-shaped) and `betelgeuse` (99%). Reverted to the volume bar.
+  The real pollution path is the keyword searches, which pull in any channel's videos
+  regardless of promotion — so a channel gate cannot fix it.
+- `README.md` catalogue numbers brought in line with the built file.
+
+---
+
 ## [0.7.0] — 2026-11-23
 
 ### Added

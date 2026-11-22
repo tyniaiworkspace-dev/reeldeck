@@ -16,6 +16,36 @@ TAG_RE = re.compile(
     re.I,
 )
 
+# A channel is promoted only if the long uploads are story-shaped. Without this, any
+# channel with five 20-minute videos qualified — a camera-review or cooking channel
+# cleared the bar and landed on a shelf of AI short dramas.
+STORY_RE = re.compile(
+    r"\b(drama|story|stories|episode|love|revenge|ceo|billionaire|millionaire|reborn|"
+    r"married|marriage|divorce|wedding|affair|pregnant|baby|heir|alpha|werewolf|mafia|"
+    r"bride|groom|husband|wife|secret|betray|prince|princess|emperor|empress|vampire|"
+    r"demon|system|twins?|contract|movie|film|series)\b",
+    re.I,
+)
+
+
+def story_shaped(v):
+    return bool(v.get("full") or v.get("part") or v.get("total")) or bool(
+        STORY_RE.search(v.get("title", ""))
+    )
+
+
+def good_channel(st):
+    """Promotion bar: five long uploads and three hours of them.
+
+    Two stricter versions were tried on 2026-11-23 and both were worse than this:
+    a title-keyword ratio pruned a channel that was 100% Netshort dramas ("Married To
+    Mr. No Mercy"), and a 45-minute mean-episode floor pruned two channels that were
+    70% and 99% story-shaped (their Reelshort episodes run 30-40 minutes). Wording and
+    episode length are both weak genre instruments. The bar stays on volume, and the
+    off-theme share is printed as evidence for the next review instead of being acted on.
+    """
+    return st["n"] >= 5 and st["hours"] >= 3
+
 
 def get(path, params):
     url = f"{API}{path}?" + urllib.parse.urlencode(params)
@@ -165,9 +195,14 @@ def main():
     per_channel = {}
     for v in videos.values():
         if v["duration"] >= 600:
-            c = per_channel.setdefault(v["channel_id"], {"name": v["channel"], "n": 0, "hours": 0})
+            c = per_channel.setdefault(v["channel_id"], {
+                "name": v["channel"], "n": 0, "hours": 0, "story_n": 0, "story_hours": 0,
+            })
             c["n"] += 1
             c["hours"] += v["duration"] / 3600
+            if story_shaped(v):
+                c["story_n"] += 1
+                c["story_hours"] += v["duration"] / 3600
     discovered = [{"id": k, **v} for k, v in sorted(per_channel.items(), key=lambda x: -x[1]["n"])]
 
     out = {
@@ -186,20 +221,42 @@ def main():
     print("\n", out["counts"])
     print(" catalog.json", round(len(json.dumps(out)) / 1024), "KB")
 
-    # Self-expansion: a channel with five or more 20-minute uploads and three hours of
-    # long-form joins the crawl for future runs. Junk channels never clear the bar.
+    # Self-expansion: a channel with five or more 20-minute STORY uploads and three hours of
+    # story long-form joins the crawl for future runs. The story gate is what keeps a
+    # camera-review channel from qualifying on length alone.
     known_all = {c["id"] if isinstance(c, dict) else c for c in cfg.get("channels", [])}
-    promote = [
-        {"id": k, "name": v["name"], "note": "auto-discovered"}
-        for k, v in per_channel.items()
-        if v["n"] >= 5 and v["hours"] >= 3 and k not in known_all
-    ]
-    existing = {c["id"] for c in auto}
-    merged = auto + [c for c in promote if c["id"] not in existing]
+    promote, rejected = [], []
+    for k, v in per_channel.items():
+        if k in known_all:
+            continue
+        if good_channel(v):
+            promote.append({"id": k, "name": v["name"], "note": "auto-discovered"})
+        elif v["n"] >= 5 and v["hours"] >= 3:
+            rejected.append(f"{v['name']} (mean {v['hours']*60/v['n']:.0f} min)")
+    if rejected:
+        print(" not promoted, off-theme:", "; ".join(rejected))
+    thin = [f"{v['name']} {v['story_n']}/{v['n']}" for v in per_channel.values()
+            if v["n"] >= 5 and v["story_n"] / max(1, v["n"]) < 0.3]
+    if thin:
+        print(" NOTE low story-share (kept, review later):", "; ".join(thin[:10]))
+    # An auto channel that was promoted under the old length-only rule is pruned the first
+    # time it fails the story bar, so the stragglers already in the file do not persist.
+    keep, pruned = [], []
+    for c in auto:
+        st = per_channel.get(c["id"])
+        if st and not good_channel(st):
+            pruned.append(c.get("name", c.get("id", "?")))
+        else:
+            keep.append(c)
+    if pruned:
+        print(" pruned from channels-auto.json:", ", ".join(pruned))
+
+    existing = {c["id"] for c in keep}
+    merged = keep + [c for c in promote if c["id"] not in existing]
     if merged != auto:
         json.dump({"channels": merged[:60]}, open("channels-auto.json", "w"),
                   ensure_ascii=False, indent=1)
-        print(f" channels-auto.json: +{len(merged) - len(auto)} (total {len(merged[:60])})")
+        print(f" channels-auto.json: +{len(merged) - len(keep)} (total {len(merged[:60])})")
 
 
 if __name__ == "__main__":
