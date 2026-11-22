@@ -487,7 +487,12 @@
     items: [],
     series: [],
     longOnly: store('rd.long') === true,
-    fullOnly: store('rd.full') !== false
+    fullOnly: store('rd.full') !== false,
+    catalog: null,
+    shelfQuery: '',
+    shelfPage: 1,
+    shelfAll: [],
+    followOnly: false
   };
 
   function channelById(id){
@@ -662,8 +667,95 @@
     }
   }
 
-  function setStatus(msg, isErr, retryFn){
-    var s = $('feedStatus');
+  // ---------- shelf (catalog.json: the whole library, refreshed by a scheduled build) ----------
+  function shelfCardHTML(s, i){
+    var complete = s.state === 'full' || s.state === 'set';
+    var sub = (s.channel || '') + (s.views ? ' · ' + views(s.views) + ' views' : '');
+    return '<button class="card" data-shelf="' + i + '">' +
+      '<div class="thumb">' +
+        (s.thumb ? '<img loading="lazy" src="' + esc(s.thumb) + '" alt="">' : '<div class="ph">🎬</div>') +
+        (s.label ? '<span class="state ' + (complete ? 'ok' : 'checking') + '">' + esc(s.label) + '</span>' : '') +
+        '<span class="dur">' + dur(s.duration) + '</span>' +
+      '</div>' +
+      '<div class="meta">' +
+        '<span class="title">' + esc(s.title) + '</span>' +
+        '<span class="sub">' + esc(sub) + '</span>' +
+      '</div>' +
+    '</button>';
+  }
+
+  function shelfList(){
+    var c = state.catalog;
+    if(!c) return [];
+    var q = (state.shelfQuery || '').trim().toLowerCase();
+    return c.series.filter(function(s){
+      if(state.fullOnly && s.state !== 'full') return false;
+      if(state.longOnly && s.duration < 1200) return false;
+      if(state.followOnly && follows.indexOf(s.channel_id) < 0) return false;
+      if(q && (s.title + ' ' + (s.channel || '')).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+  }
+
+  function renderShelf(reset){
+    var list = shelfList();
+    var size = 48;
+    if(reset) state.shelfPage = 1;
+    var slice = list.slice(0, state.shelfPage * size);
+    state.shelfAll = slice;
+    $('feedGrid').innerHTML = slice.map(shelfCardHTML).join('');
+    $('feedStatus').hidden = true;
+    var more = $('loadMore');
+    more.hidden = slice.length >= list.length;
+    more.textContent = 'Load more (' + (list.length - slice.length) + ' left)';
+    if(!list.length){
+      setStatus(q_or_filters());
+    }
+  }
+
+  function q_or_filters(){
+    if(state.shelfQuery) return 'Nothing called “' + state.shelfQuery + '”. Clear the search to see everything.';
+    return 'No stories match those filters yet.';
+  }
+
+  function openShelf(i){
+    var s = (state.shelfAll || [])[Number(i)];
+    if(!s) return;
+    var parts = (s.parts && s.parts.length
+      ? s.parts
+      : [{id: s.id, title: s.title, duration: s.duration, thumb: s.thumb}]
+    ).map(function(p){
+      return {
+        id: p.id,
+        title: p.title || s.title,
+        duration: p.duration || 0,
+        thumb: p.thumb || s.thumb,
+        channel: s.channel,
+        views: s.views,
+        platform: 'dailymotion',
+        url: 'https://www.dailymotion.com/video/' + p.id,
+        embed: true
+      };
+    });
+    if(parts.length < 2){ openItem(parts[0]); return; }
+    openSeries({sid: 'shelf-' + s.id, parts: parts, state: 'set', label: s.label});
+  }
+
+  function loadCatalog(){
+    return fetch('catalog.json', {cache:'no-store'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(c){
+        if(!c || !c.series || !c.series.length) return false;
+        state.catalog = c;
+        state.mode = 'shelf';
+        renderChips();
+        renderShelf(true);
+        return true;
+      })
+      .catch(function(){ return false; });
+  }
+
+  function setStatus(msg, isErr, retryFn){    var s = $('feedStatus');
     s.hidden = false;
     s.className = 'status' + (isErr ? ' err' : '');
     s.innerHTML = '<div class="big">' + (isErr ? '⚠️' : '🎬') + '</div>' + esc(msg) +
@@ -677,6 +769,16 @@
   }
 
   function renderChips(){
+    if(state.catalog){
+      var c = state.catalog;
+      var html = '<button class="chip' + (!state.fullOnly && !state.followOnly ? ' on' : '') + '" data-chip="all">All ' + (c.counts ? c.counts.series : c.series.length) + '</button>';
+      html += '<button class="chip' + (state.fullOnly ? ' on' : '') + '" data-chip="full">Complete</button>';
+      html += '<button class="chip' + (state.longOnly ? ' on' : '') + '" data-chip="long">20 min+</button>';
+      html += '<button class="chip' + (state.followOnly ? ' on' : '') + '" data-chip="follow">Following' +
+        (follows.length ? ' <span class="n">' + follows.length + '</span>' : '') + '</button>';
+      $('feedChips').innerHTML = html;
+      return;
+    }
     var html = '<button class="chip' + (state.mode === 'following' ? ' on' : '') + '" data-chip="following">Following' +
       (follows.length ? ' <span class="n">' + follows.length + '</span>' : '') + '</button>';
     html += QUERIES.map(function(q){
@@ -1238,8 +1340,15 @@
   $('searchForm').addEventListener('submit', function(e){
     e.preventDefault();
     var q = $('searchInput').value.trim();
+    state.query = q || state.query;
+    if(state.catalog){
+      state.shelfQuery = q;
+      showTab('feed');
+      renderShelf(true);
+      return;
+    }
     if(!q) return;
-    state.query = q; store('rd.query', q);
+    store('rd.query', q);
     state.mode = 'all';
     showTab('feed');
     renderChips();
@@ -1247,6 +1356,18 @@
   });
 
   $('feedChips').addEventListener('click', function(e){
+    if(state.catalog){
+      var sb = e.target.closest('[data-chip]');
+      if(!sb) return;
+      var sk = sb.getAttribute('data-chip');
+      if(sk === 'all'){ state.fullOnly = false; state.followOnly = false; }
+      else if(sk === 'full'){ state.fullOnly = !state.fullOnly; }
+      else if(sk === 'long'){ state.longOnly = !state.longOnly; }
+      else if(sk === 'follow'){ state.followOnly = !state.followOnly; }
+      renderChips();
+      renderShelf(true);
+      return;
+    }
     var q = e.target.closest('[data-query]');
     if(q){
       state.query = q.getAttribute('data-query');
@@ -1279,6 +1400,8 @@
   });
 
   $('feedGrid').addEventListener('click', function(e){
+    var sh = e.target.closest('[data-shelf]');
+    if(sh){ openShelf(sh.getAttribute('data-shelf')); return; }
     var c = e.target.closest('[data-series]');
     if(!c) return;
     var sid = Number(c.getAttribute('data-series'));
@@ -1288,6 +1411,11 @@
   });
 
   $('loadMore').addEventListener('click', function(){
+    if(state.catalog){
+      state.shelfPage += 1;
+      renderShelf(false);
+      return;
+    }
     state.page += 1;
     loadFeed(false);
   });
@@ -1418,9 +1546,14 @@
 
   // ---------- boot ----------
   function boot(){
-    $('searchInput').value = state.query;
-    renderChips();
-    loadFeed(true);
+    $('searchInput').value = '';
+    // The shelf loads first: the whole library, one request. Live search is the fallback.
+    loadCatalog().then(function(ok){
+      if(ok) return;
+      $('searchInput').value = state.query;
+      renderChips();
+      loadFeed(true);
+    });
 
     // Android share sheet: "Share → ReelDeck" lands here as ?share=<url>
     renderSaved();
@@ -1470,6 +1603,9 @@
     buildSeries: buildSeries,
     findCopies: findCopies,
     openSeries: openSeries,
+    openShelf: openShelf,
+    renderShelf: renderShelf,
+    shelfList: shelfList,
     openItem: openItem
   };
 })();

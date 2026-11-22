@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+"""Build catalog.json for ReelDeck: crawl every known channel plus keyword searches,
+group uploads into stories, and record which stories are complete.
+
+Keyless Dailymotion API (CORS-open, no token). Run from cron to keep the shelf fresh.
+"""
+import json, re, sys, time, urllib.parse, urllib.request
+
+API = "https://api.dailymotion.com"
+FIELDS = "id,title,duration,thumbnail_360_url,url,created_time,views_total,owner,owner.screenname,allow_embed,geoblocking"
+UA = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+
+TAG_RE = re.compile(
+    r"\b(full (?:movie|drama|series|episodes?|story)|complete|all episodes?"
+    r"|eng(?:lish)? sub(?:title)?s?|short drama|full short drama|joyreels|netshort|hd|720p|1080p)\b",
+    re.I,
+)
+
+
+def get(path, params):
+    url = f"{API}{path}?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=25) as r:
+                return json.load(r)
+        except Exception as e:
+            if attempt == 2:
+                print(f"  ! {path} {params.get('page','')}: {e}", file=sys.stderr)
+                return {"list": []}
+            time.sleep(1.5)
+
+
+def analyze(title):
+    t = title or ""
+    a = {"base": "", "part": 0, "total": 0, "range": None, "full": False}
+    m = re.search(r"\bepisodes?\s*(\d+)\s*[-–]\s*(\d+)\b", t, re.I)
+    if m:
+        a["range"] = (int(m.group(1)), int(m.group(2)))
+    else:
+        m = re.search(r"\b(?:part|pt)\.?\s*(\d+)\s*(?:/\s*(\d+))?\b", t, re.I)
+        if not m:
+            m = re.search(r"\b(?:episode|ep)\.?\s*(\d+)\s*(?:/\s*(\d+))?\b", t, re.I)
+        if m:
+            a["part"] = int(m.group(1))
+            a["total"] = int(m.group(2) or 0)
+    a["full"] = bool(re.search(
+        r"\b(full (?:movie|drama|series|episodes?|story)|complete|all episodes?)\b", t, re.I
+    )) or (a["part"] == 1 and a["total"] == 1) or bool(a["range"])
+    base = re.sub(r"\bepisodes?\s*\d+\s*[-–]\s*\d+", " ", t, flags=re.I)
+    base = re.sub(r"\b(?:part|pt|episode|ep)\.?\s*\d+\s*(?:/\s*\d+)?", " ", base, flags=re.I)
+    base = TAG_RE.sub(" ", base)
+    base = re.sub(r"[\u2600-\u27bf\U0001F000-\U0001FAFF]", " ", base)
+    base = re.sub(r"""[\[\](){}|:;,.!?"'“”‘’#*_~\-–—]""", " ", base)
+    base = re.sub(r"\s+", " ", base).strip().lower()
+    base = re.sub(r"\s+(drama|movie|series)\s*$", "", base)
+    a["base"] = base
+    return a
+
+
+def norm(v):
+    a = analyze(v.get("title", ""))
+    return {
+        "id": v["id"],
+        "title": v.get("title", ""),
+        "duration": v.get("duration", 0) or 0,
+        "thumb": v.get("thumbnail_360_url", ""),
+        "url": v.get("url") or f"https://www.dailymotion.com/video/{v['id']}",
+        "channel": (v.get("owner.screenname") or ""),
+        "channel_id": (v.get("owner") or ""),
+        "views": v.get("views_total", 0) or 0,
+        "created": v.get("created_time", 0) or 0,
+        "embed": v.get("allow_embed") is not False,
+        "part": a["part"],
+        "total": a["total"],
+        "full": a["full"],
+        "base": a["base"],
+    }
+
+
+def main():
+    cfg = json.load(open("channels.json"))
+    channels = cfg.get("channels", [])
+    try:
+        auto = json.load(open("channels-auto.json")).get("channels", [])
+    except Exception:
+        auto = []
+    known = {c["id"] if isinstance(c, dict) else c for c in channels}
+    for c in auto:
+        if c["id"] not in known:
+            channels.append(c)
+            known.add(c["id"])
+    queries = cfg.get("queries", [])
+    videos = {}
+
+    for ch in channels:
+        cid = ch["id"] if isinstance(ch, dict) else ch
+        name = ch.get("name", "") if isinstance(ch, dict) else ""
+        got = 0
+        for page in (1, 2, 3):
+            d = get(f"/user/{cid}/videos", {"fields": FIELDS, "limit": 100, "page": page,
+                                            "sort": "recent"})
+            lst = d.get("list", [])
+            for v in lst:
+                videos[v["id"]] = norm(v)
+            got += len(lst)
+            if len(lst) < 100:
+                break
+        print(f"  channel {cid} {name}: {got}")
+
+    for q in queries:
+        got = 0
+        for page in (1, 2, 3):
+            d = get("/videos", {"fields": FIELDS, "limit": 100, "page": page,
+                                "search": q, "sort": "relevance"})
+            lst = d.get("list", [])
+            for v in lst:
+                videos[v["id"]] = norm(v)
+            got += len(lst)
+            if len(lst) < 100:
+                break
+        print(f"  search {q!r}: {got}")
+
+    # group into stories
+    groups = {}
+    for v in videos.values():
+        key = v["base"] if len(v["base"]) >= 18 else (v["base"], v["channel_id"])
+        groups.setdefault(key, []).append(v)
+
+    series = []
+    for key, parts in groups.items():
+        parts.sort(key=lambda x: (x["part"] or 0, x["created"]))
+        full = [p for p in parts if p["full"]]
+        if full:
+            best = max(full, key=lambda p: p["duration"])
+            state, label = "full", "FULL"
+            item = best
+        elif len(parts) > 1:
+            best = max(parts, key=lambda p: p["duration"])
+            state, label = "set", f"{len(parts)} PARTS"
+            item = best
+        else:
+            state, label = "single", f"{parts[0]['duration']//60} MIN"
+            item = parts[0]
+        series.append({
+            "title": item["title"],
+            "state": state,
+            "label": label,
+            "duration": best["duration"] if state == "set" else item["duration"],
+            "thumb": item["thumb"],
+            "url": item["url"],
+            "id": item["id"],
+            "channel": item["channel"],
+            "channel_id": item["channel_id"],
+            "views": sum(p["views"] for p in parts),
+            "created": max(p["created"] for p in parts),
+            "parts": [{"id": p["id"], "title": p["title"], "duration": p["duration"],
+                       "part": p["part"], "total": p["total"], "thumb": p["thumb"]}
+                      for p in parts[:40]],
+        })
+
+    series.sort(key=lambda s: (s["state"] != "full", -s["views"]))
+
+    # channels that actually supply long-form stories
+    per_channel = {}
+    for v in videos.values():
+        if v["duration"] >= 600:
+            c = per_channel.setdefault(v["channel_id"], {"name": v["channel"], "n": 0, "hours": 0})
+            c["n"] += 1
+            c["hours"] += v["duration"] / 3600
+    discovered = [{"id": k, **v} for k, v in sorted(per_channel.items(), key=lambda x: -x[1]["n"])]
+
+    out = {
+        "built": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "counts": {
+            "videos": len(videos),
+            "series": len(series),
+            "full": sum(1 for s in series if s["state"] == "full"),
+            "set": sum(1 for s in series if s["state"] == "set"),
+            "hours": round(sum(v["duration"] for v in videos.values()) / 3600, 1),
+        },
+        "channels": discovered[:60],
+        "series": series,
+    }
+    json.dump(out, open("catalog.json", "w"), ensure_ascii=False, separators=(",", ":"))
+    print("\n", out["counts"])
+    print(" catalog.json", round(len(json.dumps(out)) / 1024), "KB")
+
+    # Self-expansion: a channel with five or more 20-minute uploads and three hours of
+    # long-form joins the crawl for future runs. Junk channels never clear the bar.
+    known_all = {c["id"] if isinstance(c, dict) else c for c in cfg.get("channels", [])}
+    promote = [
+        {"id": k, "name": v["name"], "note": "auto-discovered"}
+        for k, v in per_channel.items()
+        if v["n"] >= 5 and v["hours"] >= 3 and k not in known_all
+    ]
+    existing = {c["id"] for c in auto}
+    merged = auto + [c for c in promote if c["id"] not in existing]
+    if merged != auto:
+        json.dump({"channels": merged[:60]}, open("channels-auto.json", "w"),
+                  ensure_ascii=False, indent=1)
+        print(f" channels-auto.json: +{len(merged) - len(auto)} (total {len(merged[:60])})")
+
+
+if __name__ == "__main__":
+    main()
