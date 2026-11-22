@@ -132,6 +132,19 @@
   .helplist li{margin-bottom:7px}
   .helplist b{color:var(--text)}
   .helplist a{color:var(--accent);text-decoration:underline}
+  .boxaddr{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px 10px;margin-bottom:10px;text-align:center}
+  .boxaddr code{font:700 15px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);word-break:break-all}
+  .boxmeta{font-size:11.5px;color:var(--muted);margin:8px 0 10px;line-height:1.45}
+  .boxbtn{padding:0 14px;height:38px;border-radius:12px;background:var(--card2);border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--muted)}
+  .boxrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .boxempty{font-size:12.5px;color:var(--muted);padding:10px 0}
+  .msg{border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden;background:var(--card2)}
+  .msghead{display:block;width:100%;text-align:left;padding:11px 12px;color:var(--text)}
+  .msghead b{display:block;font-size:13px;margin-bottom:3px;line-height:1.35}
+  .msghead span{font-size:11px;color:var(--muted)}
+  .msgbody{padding:0 12px 12px;border-top:1px solid var(--line)}
+  .msgtext{white-space:pre-wrap;word-break:break-word;font-size:12.5px;color:var(--text);line-height:1.5;max-height:320px;overflow:auto;margin:10px 0}
+  .msgl a{display:inline-block;margin:0 10px 6px 0;font-size:12.5px;color:var(--accent);text-decoration:underline}
 
   .apps{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
   @media(min-width:620px){.apps{grid-template-columns:repeat(4,1fr)}}
@@ -326,8 +339,32 @@
       <p>Watching inside ReelDeck also needs no account. The next panel is only for when Dailymotion itself blocks a link.</p>
     </div>
 
+    <div class="panel" id="boxPanel">
+      <h2>Throwaway inbox — never your real email</h2>
+      <p>Some sites ask for an address before they play, or before they let a story continue. Make one here instead. It needs no sign-up, it lives on this phone, and it dies by itself. Give the address out, read whatever arrives below, then forget it.</p>
+      <div id="boxIdle">
+        <div class="boxrow">
+          <input id="boxName" placeholder="pick a name (optional)" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:11px 13px;font-size:15px;outline:none">
+          <button id="boxMake" style="background:var(--accent);border-radius:12px;padding:0 16px;font-weight:700;font-size:14px;color:#fff">Make it</button>
+        </div>
+        <p class="hint">Leave the name blank for a random one. If a site only asks for an address and never sends a code, any address works — you can type one without opening this page.</p>
+      </div>
+      <div id="boxLive" hidden>
+        <div class="boxaddr"><code id="boxAddr"></code></div>
+        <div class="boxrow">
+          <button id="boxCopy" class="boxbtn">Copy address</button>
+          <button id="boxRefresh" class="boxbtn">Check now</button>
+          <button id="boxExtend" class="boxbtn">Keep 1 more hour</button>
+        </div>
+        <div class="boxmeta" id="boxMeta"></div>
+        <div id="boxMsgs"></div>
+        <button id="boxForget" class="boxbtn" style="color:var(--accent)">Forget this address</button>
+      </div>
+      <p class="hint" style="margin-top:12px">Want mail that comes to you instead? <b>Gmail plus:</b> add <code>+anything</code> before the @ (e.g. <code>name+drama@gmail.com</code>) — it still lands in that inbox and tells you who leaked it. <b>DuckDuckGo:</b> the free DuckDuckGo app makes unlimited <code>@duck.com</code> addresses that forward to a real inbox and can be switched off later.</p>
+    </div>
+
     <div class="panel">
-      <h2>If it asks for an email</h2>
+      <h2>If it still asks for an email</h2>
       <p>The player inside ReelDeck never needs an account. If the Dailymotion site or app asks anyway, these four checks tell you what is causing it:</p>
       <ul class="helplist">
         <li><b>Incognito.</b> Chrome ⋮ → New Incognito tab, paste the link. If it plays there, the prompt came from saved cookies.</li>
@@ -336,6 +373,11 @@
         <li><b>Another copy.</b> Tap “Find the full version”. The same story on another channel often plays.</li>
       </ul>
       <p>If all four still ask, stop fighting it — use <b>Save a copy</b> above. A file on the phone has no login screen.</p>
+    </div>
+
+    <div class="panel">
+      <h2>What this runs on</h2>
+      <p>Every piece is free: GitHub Pages for the app, the home machine for the catalogue crawl, Dailymotion's public API for the data, yt-dlp for full copies, a keyless inbox for the email wall. The full list of free services we can wire next — storage, servers, mail, APIs — is in <a href="FREE-STACK.md" target="_blank" rel="noopener">FREE-STACK.md</a>.</p>
     </div>
 
     <div class="panel">
@@ -1323,6 +1365,158 @@
     clearTimeout(partTimer);
   }
 
+  // ---------- throwaway inbox (Guerrilla Mail: keyless, CORS-open) ----------
+  // Verified 2026-11-23: the API answers with Access-Control-Allow-Origin: *,
+  // so a static page can create an address and read mail with no server and no key.
+  var BOX_API = 'https://api.guerrillamail.com/ajax.php';
+  var box = store('rd.box');
+  var boxMsgs = [];
+  var boxOpenId = null;
+  var boxOpenBody = '';
+  var boxOpenLinks = [];
+  var boxTimer = null;
+  var boxBusy = false;
+
+  function boxCall(params){
+    var qs = Object.keys(params).map(function(k){
+      return k + '=' + encodeURIComponent(params[k]);
+    }).join('&');
+    return fetch(BOX_API + '?' + qs + '&agent=reeldeck', {cache:'no-store'}).then(function(r){
+      if(!r.ok) throw new Error('inbox ' + r.status);
+      return r.json();
+    });
+  }
+
+  function htmlToText(h){
+    return String(h || '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|tr|li|h[1-6]|blockquote)>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function linksFrom(html){
+    var out = [], re = /href\s*=\s*["']([^"']+)["']/gi, m;
+    while((m = re.exec(String(html || '')))){
+      var u = m[1].replace(/&amp;/g, '&');
+      if(/^https?:/i.test(u) && out.indexOf(u) < 0) out.push(u);
+    }
+    return out.slice(0, 6);
+  }
+
+  function boxRender(){
+    var live = !!(box && box.sid);
+    $('boxIdle').hidden = live;
+    $('boxLive').hidden = !live;
+    if(!live) return;
+    $('boxAddr').textContent = box.addr;
+    var left = Math.round((Number(box.exp) - Date.now() / 1000) / 60);
+    $('boxMeta').textContent = left > 0
+      ? 'Works for about ' + left + ' more minutes. Mail sent to it appears below — this page checks every 10 seconds while it is open.'
+      : 'This address has expired. Make a new one — sites that already accepted it will keep working, but new mail will not arrive.';
+  }
+
+  function boxRenderMsgs(){
+    var el = $('boxMsgs');
+    if(!el) return;
+    if(!boxMsgs.length){
+      el.innerHTML = '<div class="boxempty">No mail yet. Give the address out, then tap “Check now”.</div>';
+      return;
+    }
+    el.innerHTML = boxMsgs.map(function(m){
+      var open = String(boxOpenId) === String(m.mail_id);
+      return '<div class="msg">' +
+        '<button class="msghead" data-msg="' + esc(m.mail_id) + '">' +
+          '<b>' + esc(m.mail_subject || '(no subject)') + '</b>' +
+          '<span>' + esc(m.mail_from || '') + ' · ' + esc(m.mail_date || ago(m.mail_timestamp)) + '</span>' +
+        '</button>' +
+        (open ? '<div class="msgbody"><div class="msgtext">' + esc(boxOpenBody) + '</div>' +
+          (boxOpenLinks.length ? '<div class="msgl">' + boxOpenLinks.map(function(u, i){
+            return '<a href="' + esc(u) + '" target="_blank" rel="noopener">Open link ' + (i + 1) + '</a>';
+          }).join('') + '</div>' : '') + '</div>' : '') +
+      '</div>';
+    }).join('');
+  }
+
+  function boxPoll(){
+    if(!box || !box.sid || boxBusy) return Promise.resolve();
+    boxBusy = true;
+    return boxCall({f:'get_email_list', offset:'0', sid_token:box.sid}).then(function(d){
+      var list = (d && d.list) || [];
+      var isNew = list.length > boxMsgs.length;
+      boxMsgs = list;
+      boxBusy = false;
+      boxRender();
+      boxRenderMsgs();
+      if(isNew) toast('New mail in the throwaway inbox');
+    }).catch(function(){
+      boxBusy = false;
+    });
+  }
+
+  function boxStartPolling(){
+    clearInterval(boxTimer);
+    if(!box || !box.sid) return;
+    boxTimer = setInterval(function(){
+      if(state.tab === 'apps' && !document.hidden) boxPoll();
+    }, 10000);
+  }
+
+  function boxMake(){
+    var name = ($('boxName').value || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 24);
+    var params = name
+      ? {f:'set_email_user', email_user:name, lang:'en', site:'guerrillamail.com'}
+      : {f:'get_email_address', lang:'en', site:'guerrillamail.com'};
+    $('boxMake').disabled = true;
+    boxCall(params).then(function(d){
+      if(!d || !d.email_addr || !d.sid_token){
+        toast(d && d.alias_error ? 'That name is taken — try another' : 'Could not make an address');
+        return;
+      }
+      box = {addr:d.email_addr, sid:d.sid_token,
+             exp:(Number(d.email_timestamp) || Math.round(Date.now() / 1000)) + 3600};
+      store('rd.box', box);
+      boxMsgs = []; boxOpenId = null; boxOpenBody = ''; boxOpenLinks = [];
+      $('boxName').value = '';
+      boxRender(); boxRenderMsgs(); boxStartPolling(); boxPoll();
+    }).catch(function(){
+      toast('Could not reach the inbox service — try again in a minute');
+    }).then(function(){
+      $('boxMake').disabled = false;
+    });
+  }
+
+  function boxOpen(id){
+    if(String(boxOpenId) === String(id)){
+      boxOpenId = null; boxOpenBody = ''; boxOpenLinks = []; boxRenderMsgs(); return;
+    }
+    boxOpenId = id; boxOpenBody = 'Loading…'; boxOpenLinks = [];
+    boxRenderMsgs();
+    boxCall({f:'fetch_email', email_id:id, sid_token:box.sid}).then(function(d){
+      var body = (d && (d.mail_body || d.mail_excerpt)) || '';
+      boxOpenBody = body.indexOf('<') >= 0 ? htmlToText(body) : String(body);
+      boxOpenLinks = linksFrom(body);
+      boxRenderMsgs();
+    }).catch(function(){
+      boxOpenBody = 'Could not load that message.';
+      boxRenderMsgs();
+    });
+  }
+
+  function boxForget(){
+    var sid = box && box.sid;
+    box = null; boxMsgs = []; boxOpenId = null; boxOpenBody = ''; boxOpenLinks = [];
+    try{ localStorage.removeItem('rd.box'); }catch(e){}
+    clearInterval(boxTimer);
+    boxRender();
+    if(sid) boxCall({f:'forget_me', sid_token:sid}).catch(function(){});
+    toast('Inbox forgotten');
+  }
+
   // ---------- tabs ----------
   function showTab(name){
     state.tab = name;
@@ -1333,7 +1527,9 @@
     for(var i=0;i<btns.length;i++) btns[i].classList.toggle('on', btns[i].getAttribute('data-tab') === name);
     if(name === 'saved'){ renderSaved(); renderFamily(); }
     if(name === 'channels') renderChannels();
-    if(name === 'apps'){ renderApps(); renderRecent(); }
+    if(name === 'apps'){ renderApps(); renderRecent(); boxRender(); boxRenderMsgs(); boxPoll(); }
+    if(name !== 'apps') clearInterval(boxTimer);
+    else boxStartPolling();
   }
 
   // ---------- wiring ----------
@@ -1431,6 +1627,26 @@
 
   $('pasteBtn').addEventListener('click', function(){ openLink($('pasteInput').value); });
   $('pasteInput').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); openLink($('pasteInput').value); } });
+
+  $('boxMake').addEventListener('click', boxMake);
+  $('boxName').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); boxMake(); } });
+  $('boxCopy').addEventListener('click', function(){ if(box) copyText(box.addr, 'Address copied'); });
+  $('boxRefresh').addEventListener('click', function(){ boxPoll().then(function(){ toast('Checked'); }); });
+  $('boxExtend').addEventListener('click', function(){
+    if(!box) return;
+    boxCall({f:'extend', sid_token:box.sid}).then(function(d){
+      var base = Number(d && d.email_timestamp) || Math.round(Date.now() / 1000);
+      box.exp = base + 3600;
+      store('rd.box', box);
+      boxRender();
+      toast('Kept for one more hour');
+    }).catch(function(){ toast('Could not extend it'); });
+  });
+  $('boxForget').addEventListener('click', boxForget);
+  $('boxMsgs').addEventListener('click', function(e){
+    var b = e.target.closest('[data-msg]');
+    if(b) boxOpen(b.getAttribute('data-msg'));
+  });
 
   $('playerBody').addEventListener('click', function(e){
     if(e.target.closest('#findCopyBtn')) findCopies(current);
@@ -1547,6 +1763,8 @@
   // ---------- boot ----------
   function boot(){
     $('searchInput').value = '';
+    boxRender();
+    boxRenderMsgs();
     // The shelf loads first: the whole library, one request. Live search is the fallback.
     loadCatalog().then(function(ok){
       if(ok) return;
@@ -1606,7 +1824,10 @@
     openShelf: openShelf,
     renderShelf: renderShelf,
     shelfList: shelfList,
-    openItem: openItem
+    openItem: openItem,
+    box: function(){ return box; },
+    boxPoll: boxPoll,
+    boxMake: boxMake
   };
 })();
 </script>
