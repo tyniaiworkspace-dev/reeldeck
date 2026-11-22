@@ -1049,7 +1049,7 @@
       }
       var partLabel = analyzeTitle(item.title).part ? 'Find the full version' : 'Find another copy';
       return '<div class="frame"><iframe src="https://www.dailymotion.com/embed/video/' + encodeURIComponent(item.id) + '?autoplay=1&queue-enable=false" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>' +
-        '<div class="playhint">Says “forbidden”? <button class="linkbtn" id="findCopyBtn">' + partLabel + '</button> — the same story is usually uploaded on several channels.</div>';
+        '<div class="playhint">Says “forbidden”? <button class="linkbtn" id="findCopyBtn">' + partLabel + '</button> — the same story is usually on several channels. If the app asks for your email, <b>Open in Chrome</b> plays it without an account.</div>';
     }
     if(item.platform === 'tiktok'){
       return '<div class="frame"><iframe src="https://www.tiktok.com/player/v1/' + encodeURIComponent(item.id) + '?autoplay=1" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>';
@@ -1068,6 +1068,21 @@
 
   function seriesList(s){ return s.full ? [s.full] : s.parts; }
 
+  var isAndroid = /Android/i.test(navigator.userAgent);
+
+  // Dailymotion's Android app pushes a sign-in screen; its own terms allow watching
+  // as a guest. An intent:// link with package=com.android.chrome opens the same
+  // page in Chrome instead, where no account is asked for.
+  function openHref(item){
+    if(item.platform === 'dailymotion' && isAndroid){
+      var web = item.url || canonicalUrl('dailymotion', item.id);
+      return 'intent://' + web.replace(/^https?:\/\//, '') +
+        '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' +
+        encodeURIComponent(web) + ';end';
+    }
+    return item.url;
+  }
+
   function openItem(item, opts){
     current = item;
     currentSeries = null;
@@ -1075,7 +1090,8 @@
     $('partsBar').hidden = true;
     $('playerTitle').textContent = item.title || 'Video';
     $('playerBody').innerHTML = embedHTML(item);
-    $('playerOpen').href = item.url;
+    $('playerOpen').href = openHref(item);
+    $('playerOpen').textContent = (item.platform === 'dailymotion' && isAndroid) ? 'Open in Chrome' : 'Open in app';
     $('player').hidden = false;
     document.body.style.overflow = 'hidden';
     pushRecent(item);

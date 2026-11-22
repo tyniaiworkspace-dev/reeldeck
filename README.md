@@ -58,6 +58,14 @@ Dailymotion titles carry the only reliable signal, so the app reads them:
 searches the cleaned title and lists other uploads, full ones first, longest first. In testing,
 one title returned 49 versions with 6 marked FULL, including 2–3 hour complete cuts.
 
+## When the Dailymotion app asks for an email
+
+Dailymotion allows guest viewing in its own terms, but the Android app pushes a sign-in
+screen. On Android the player's open button is therefore labelled **Open in Chrome** and
+uses an `intent://…package=com.android.chrome` link, which hands the same video page to
+Chrome instead of the app. No account is needed there. The button falls back to the normal
+link if Chrome is missing.
+
 ## Link checking
 
 - **Dailymotion and YouTube** are verified in the browser: title, thumbnail and duration are
