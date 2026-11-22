@@ -7,7 +7,26 @@ working-link check, and accepts links straight from the Android share sheet.
 **Hosted free:** https://tyniaiworkspace-dev.github.io/reeldeck/
 **Home Wi-Fi copy:** http://192.168.8.221:8788 (runs on the PC, `systemctl --user status reeldeck`)
 
-No accounts, no logins, no Tailscale, no downloads, no re-hosting.
+No accounts, no logins, no Tailscale, nothing to install. Playback uses the platform's own
+player; `rip.sh` keeps a file for anything that gets walled.
+
+## The shelf
+
+The Feed opens on a catalogue instead of a search box: **3,132 stories, 1,371 of them
+complete**, 3,234 hours, built from 14 seeded Dailymotion channels plus three keyword crawls.
+Cards show the poster, the duration and a `FULL` badge when the upload is the whole story.
+Chips filter to complete stories (the default), 20 minutes and up, or channels you follow;
+the search box filters instantly without a network round trip.
+
+`catalog.py` rebuilds it. It is keyless — Dailymotion's API needs no token — and it also
+promotes new channels that clear five 20-minute uploads and three hours of long-form, so the
+shelf widens by itself. `refresh.sh` crawls and pushes; a systemd timer runs it daily at
+03:17 (`systemctl --user list-timers reeldeck-catalog.timer`). `catalog-workflow.example.yml`
+is the same job for GitHub Actions when a token with the `workflow` scope is available, which
+keeps it running while this PC is off.
+
+Catalogue as of 2026-11-23: 3,521 videos → 3,132 stories, 1,371 complete, 1,080 of those over
+40 minutes; 1,749 KB of JSON, served by Pages.
 
 ## Put it on a phone
 
