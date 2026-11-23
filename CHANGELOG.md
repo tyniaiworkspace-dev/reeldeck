@@ -11,6 +11,21 @@ started; the app had no version number until then.
 
 ---
 
+## [0.8.1] — 2026-11-23
+
+### Added
+- **Copy + open Dailymotion** in the throwaway inbox: one tap opens the sign-in page and puts
+  the address on the clipboard, so the paste is the only step left.
+- **"Which kind of wall is it?"** — the four walls named with their shortest route: address-only
+  (type anything), code or link (inbox), full account (inbox + note the password), and
+  "Continue with Google" (the only one that stays signed in).
+
+### Changed
+- Nothing else. The sign-in limit is documented rather than engineered around: a page on our
+  origin cannot write `dailymotion.com` cookies, so no address can auto-log-in for a phone.
+
+---
+
 ## [0.8.0] — 2026-11-23
 
 ### Added

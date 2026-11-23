@@ -6,7 +6,7 @@ working-link check, and accepts links straight from the Android share sheet.
 
 **Hosted free:** https://tyniaiworkspace-dev.github.io/reeldeck/
 **Home Wi-Fi copy:** http://192.168.8.221:8788 (runs on the PC, `systemctl --user status reeldeck`)
-**Version:** 0.8.0 — see [CHANGELOG.md](CHANGELOG.md)
+**Version:** 0.8.1 — see [CHANGELOG.md](CHANGELOG.md)
 
 No accounts, no logins, no Tailscale, nothing to install. Playback uses the platform's own
 player; `rip.sh` keeps a file for anything that gets walled.

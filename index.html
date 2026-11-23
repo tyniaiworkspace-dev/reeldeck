@@ -362,14 +362,22 @@
       <div id="boxLive" hidden>
         <div class="boxaddr"><code id="boxAddr"></code></div>
         <div class="boxrow">
-          <button id="boxCopy" class="boxbtn">Copy address</button>
+          <button id="boxUse" class="boxbtn" style="background:var(--accent);border-color:var(--accent);color:#fff">Copy + open Dailymotion</button>
           <button id="boxRefresh" class="boxbtn">Check now</button>
           <button id="boxExtend" class="boxbtn">Keep 1 more hour</button>
+          <button id="boxCopy" class="boxbtn">Copy only</button>
         </div>
         <div class="boxmeta" id="boxMeta"></div>
         <div id="boxMsgs"></div>
         <button id="boxForget" class="boxbtn" style="color:var(--accent)">Forget this address</button>
       </div>
+      <h3 style="font-size:13px;margin:16px 0 6px">Which kind of wall is it?</h3>
+      <ul class="helplist">
+        <li><b>Only an address.</b> Type anything — <code>anything@guerrillamailblock.com</code> works and nothing is sent. Skip this page.</li>
+        <li><b>A code or a link.</b> Make an inbox above, tap <b>Copy + open Dailymotion</b>, paste the address. The mail appears here within ten seconds.</li>
+        <li><b>A full account.</b> Use the same address to sign up; the confirmation lands here. Write the password down — the address dies after an hour.</li>
+        <li><b>“Continue with Google”.</b> The only one that stays signed in. Add one shared Google account to each phone once; after that it is one tap and nothing is ever typed again.</li>
+      </ul>
       <p class="hint" style="margin-top:12px">Want mail that comes to you instead? <b>Gmail plus:</b> add <code>+anything</code> before the @ (e.g. <code>name+drama@gmail.com</code>) — it still lands in that inbox and tells you who leaked it. <b>DuckDuckGo:</b> the free DuckDuckGo app makes unlimited <code>@duck.com</code> addresses that forward to a real inbox and can be switched off later.</p>
     </div>
 
@@ -487,7 +495,7 @@
   ];
 
   // ---------- tiny helpers ----------
-  var APP_VERSION = '0.8.0';
+  var APP_VERSION = '0.8.1';
   var $ = function(id){ return document.getElementById(id); };
   function store(key, val){
     try{
@@ -1699,6 +1707,12 @@
   $('boxMake').addEventListener('click', boxMake);
   $('boxName').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); boxMake(); } });
   $('boxCopy').addEventListener('click', function(){ if(box) copyText(box.addr, 'Address copied'); });
+  $('boxUse').addEventListener('click', function(){
+    // One gesture does both: the tab opens first while the click is still live, then the
+    // address is on the clipboard to paste into Dailymotion's form.
+    window.open('https://www.dailymotion.com/signin', '_blank', 'noopener');
+    if(box) copyText(box.addr, 'Address copied — paste it into Dailymotion');
+  });
   $('boxRefresh').addEventListener('click', function(){ boxPoll().then(function(){ toast('Checked'); }); });
   $('boxExtend').addEventListener('click', function(){
     if(!box) return;
