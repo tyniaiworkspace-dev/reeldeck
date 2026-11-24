@@ -156,11 +156,6 @@
    "note": "auto-discovered"
   },
   {
-   "id": "x2i3p9y",
-   "name": "Movie Time",
-   "note": "auto-discovered"
-  },
-  {
    "id": "x6o8syy",
    "name": "Cardinal Stable Stories",
    "note": "auto-discovered"
@@ -298,6 +293,11 @@
   {
    "id": "x6o1h5m",
    "name": "Banyan Ferry Narratives",
+   "note": "auto-discovered"
+  },
+  {
+   "id": "x6pahia",
+   "name": "Cricket Belfry Stories",
    "note": "auto-discovered"
   }
  ]
